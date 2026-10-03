@@ -48,6 +48,16 @@ public class CraftGenericWithRecipeBooksTask extends Task implements ITaskUsesCr
 
         Slot outputSlot = bigCrafting ? CraftingTableSlot.OUTPUT_SLOT : PlayerSlot.CRAFT_OUTPUT_SLOT;
         ItemStack output = StorageHelper.getItemStackInSlot(outputSlot);
+        // Picked-up output on the cursor isn't counted below, so store it before taking more;
+        // otherwise the task keeps refilling the recipe and picking up output without progress.
+        ItemStack heldOutput = StorageHelper.getItemStackInCursorSlot();
+        if (heldOutput.getItem() == _target.getOutputItem() && !heldOutput.isEmpty()) {
+            Optional<Slot> toStore = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(heldOutput, true);
+            if (toStore.isPresent()) {
+                setDebugState("Storing crafted output from cursor");
+                return new ClickSlotTask(toStore.get());
+            }
+        }
         if (_target.getOutputItem() == output.getItem() && mod.getItemStorage().getItemCount(_target.getOutputItem()) < _target.getTargetCount()) {
             setDebugState("Getting output");
             return new ReceiveCraftingOutputSlotTask(outputSlot, _target.getTargetCount());

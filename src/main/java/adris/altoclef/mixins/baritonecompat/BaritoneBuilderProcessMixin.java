@@ -232,6 +232,18 @@ abstract class BaritoneBuilderProcessMixin {
         return hasCrafter ? 2 : maximumY;
     }
 
+    @Redirect(method = "approxPlaceable",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/world/level/block/Block;getStateForPlacement(Lnet/minecraft/world/item/context/BlockPlaceContext;)Lnet/minecraft/world/level/block/state/BlockState;"))
+    private BlockState altoclef$keepBlockItemsInApproxPlaceable(Block block, BlockPlaceContext context) {
+        // approxPlaceable simulates placing every item at the player's feet. Some blocks (a chest
+        // here) return null in that synthetic spot, and Baritone then records AIR, reports the
+        // carried item as missing and pauses. This list only gates material presence;
+        // possibleToPlace still validates the real placement and exact state.
+        BlockState predicted = block.getStateForPlacement(context);
+        return predicted != null ? predicted : block.defaultBlockState();
+    }
+
     @Redirect(method = "hasAnyItemThatWouldPlace",
             at = @At(value = "INVOKE",
                     target = "Lnet/minecraft/world/level/block/Block;getStateForPlacement(Lnet/minecraft/world/item/context/BlockPlaceContext;)Lnet/minecraft/world/level/block/state/BlockState;"))

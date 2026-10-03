@@ -1259,7 +1259,13 @@ public final class LitematicaRecoveryAcceptanceScenario {
                 if (beforeSnapshot == null || client.player == null || client.level == null
                         || !beforeSnapshot.matches(snapshot.inventory())
                         || !sameCells(snapshot.targetCells(), captureCells(client.level, origin))) {
-                    reject("interruption server/client snapshot mismatch: " + describeSnapshot(snapshot));
+                    boolean inventoryMatches = beforeSnapshot != null && beforeSnapshot.matches(snapshot.inventory());
+                    boolean cellsMatch = client.level != null
+                            && sameCells(snapshot.targetCells(), captureCells(client.level, origin));
+                    reject("interruption server/client snapshot mismatch: inventoryMatches=" + inventoryMatches
+                            + ",cellsMatch=" + cellsMatch + ",clientInventory=" + beforeSnapshot
+                            + ",clientCells=" + (client.level == null ? "none" : captureCells(client.level, origin))
+                            + ",serverCells=" + snapshot.targetCells() + ",server=" + describeSnapshot(snapshot));
                     return;
                 }
                 interruptionSnapshot = snapshot;
@@ -1529,12 +1535,18 @@ public final class LitematicaRecoveryAcceptanceScenario {
             double t=Math.min(tick,horizontalTime);
             Vec3 next = new Vec3(start.x + velocity.x*t, start.y + velocity.y*t - 0.5*gravity*t*t,
                     start.z + velocity.z*t);
+            // The arrow stops at the player; past that point the descending arc would clip the
+            // block the player is standing on.
+            java.util.Optional<Vec3> playerHit = player.getBoundingBox().clip(previous, next);
+            boolean reachesPlayer = playerHit.isPresent();
+            if (reachesPlayer) next = playerHit.get();
             BlockHitResult hit = level.clip(new ClipContext(previous, next, ClipContext.Block.COLLIDER,
                     ClipContext.Fluid.NONE, player));
             if (hit.getType() != HitResult.Type.MISS)
                 throw new IllegalStateException("ballistic arrow corridor obstructed at tick " + tick
                         + " by " + level.getBlockState(hit.getBlockPos()) + " at " + hit.getBlockPos().toShortString()
                         + " (player " + player.blockPosition().toShortString() + ", start " + start + ")");
+            if (reachesPlayer) return;
             previous=next;
         }
     }
