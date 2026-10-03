@@ -316,6 +316,11 @@ public final class MobDefenseCombatCapacityAcceptanceScenario {
         zombie.snapTo(x, center.getY(), z, x < center.getX() ? -90.0f : 90.0f, 0.0f);
         zombie.setNoAi(true);
         zombie.setPersistenceRequired();
+        // Daylight would set the fixture zombies on fire; changing health keeps client and server
+        // snapshots from ever matching, so keep their health stable.
+        zombie.addEffect(new net.minecraft.world.effect.MobEffectInstance(
+                net.minecraft.world.effect.MobEffects.FIRE_RESISTANCE, net.minecraft.world.effect.MobEffectInstance.INFINITE_DURATION,
+                0, false, false));
         if (!level.addFreshEntity(zombie)) return null;
         zombie.setTarget(player);
         return zombie;

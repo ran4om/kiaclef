@@ -4733,7 +4733,9 @@ public final class RuntimeAcceptanceMod implements ClientModInitializer {
             append("ASSERT\tnatural-world trace observed iron smelting prerequisite");
         }
         boolean fuelLoaded = trace.contains("smeltinfurnacetask")
-                && sequence.stream().anyMatch(entry -> entry.contains("MoveItemToSlotFromInventoryTask")
+                // Fuel moves run as MoveItemToSlotFromInventoryTask or the PendingFurnaceSlotTransferTask wrapper.
+                && sequence.stream().anyMatch(entry -> (entry.contains("MoveItemToSlotFromInventoryTask")
+                        || entry.contains("PendingFurnaceSlotTransferTask"))
                         && entry.contains("FurnaceSlot{") && entry.contains("window slot = 1}"));
         if (!naturalFuelTraceSeen && (trace.contains("collectfueltask") || fuelLoaded)) {
             naturalFuelTraceSeen = true;

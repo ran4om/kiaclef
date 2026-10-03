@@ -16,7 +16,7 @@
   },
   "generation": {
     "generator": "one-off inline Python; no runtime harness mutation or random values",
-    "method": "Deterministic NBT construction with Python nbtlib 2.0.4; gzip-compressed big-endian NBT; fixed metadata timestamps; palette indices packed contiguously, least-significant bits first, two bits per entry."
+    "method": "Deterministic NBT construction with Python nbtlib 2.0.4; gzip-compressed big-endian NBT; fixed metadata timestamps; palette indices packed contiguously, least-significant bits first, two bits per entry. Each region palette lists minecraft:air first, as Litematica expects; with air last, Litematica 0.28.8 overflowed its palette array (Run 183)."
   },
   "independentOracleRelativeToOrigin": [
     {
@@ -280,7 +280,7 @@
     }
   ],
   "schema": "altoclef-litematic-fixture-manifest/v1",
-  "sha256": "0849421a77d0b3b4f346fe7882fc6b4a8b888723982065fd3f04949f71c108b2",
+  "sha256": "d2c54e4ef62310c1394e0fe7c66b6030c3e4549dc86dc6bd8fb012bc6ae942f1",
   "verification": {
     "independentDecode": "After writing, reopen with nbtlib (separate pass) and independently decode all palette/index cells, NBT metadata and chest payload; verify SHA-256.",
     "loaderAcceptance": "UNVERIFIED: actual Litematica native loader acceptance, active placement transform, and state transform require root to package/run the candidate in Minecraft 26.2. This artifact generation is not gameplay evidence.",

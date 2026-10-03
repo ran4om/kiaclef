@@ -32,6 +32,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
@@ -55,7 +56,7 @@ import java.util.concurrent.ArrayBlockingQueue;
  * command after {@link #begin}; tick observes that command and owns its verdict.
  */
 public final class LitematicaRecoveryAcceptanceScenario {
-    public static final String FIXTURE_SHA256 = "0849421a77d0b3b4f346fe7882fc6b4a8b888723982065fd3f04949f71c108b2";
+    public static final String FIXTURE_SHA256 = "d2c54e4ef62310c1394e0fe7c66b6030c3e4549dc86dc6bd8fb012bc6ae942f1";
     private static final String RESOURCE = "/fixtures/altoclef-natural-recovery-rotated-4x2x1.litematic";
     // The packaged runtime runner defaults to 2,400 seconds. Leave six minutes
     // for client launch/save setup, then keep the scenario itself under 34 minutes.
@@ -854,9 +855,24 @@ public final class LitematicaRecoveryAcceptanceScenario {
                 if (p == null) throw new IllegalStateException("server player missing");
                 // Zero vertical launch speed makes the production predictor and physical
                 // ballistic arc agree despite its signed vertical-velocity convention.
-                Vec3 start = new Vec3(p.getX(), p.getY() + 5.625, p.getZ() + 9);
-                Vec3 velocity = new Vec3(0, 0, -0.6);
-                verifyArrowTrajectory(level, p, start, velocity);
+                // Try each horizontal approach and use the first whose ballistic corridor is clear,
+                // so trees or slopes on one side of a natural build site do not fail the run.
+                Vec3 start = null, velocity = null;
+                IllegalStateException obstruction = null;
+                for (int[] dir : new int[][]{{0, 1}, {0, -1}, {1, 0}, {-1, 0}}) {
+                    Vec3 candidateStart = new Vec3(p.getX() + 9 * dir[0], p.getY() + 5.625, p.getZ() + 9 * dir[1]);
+                    Vec3 candidateVelocity = new Vec3(-0.6 * dir[0], 0, -0.6 * dir[1]);
+                    try {
+                        verifyArrowTrajectory(level, p, candidateStart, candidateVelocity);
+                        start = candidateStart;
+                        velocity = candidateVelocity;
+                        break;
+                    } catch (IllegalStateException e) {
+                        obstruction = obstruction == null ? e
+                                : new IllegalStateException(obstruction.getMessage() + "; " + e.getMessage());
+                    }
+                }
+                if (start == null) throw obstruction;
                 float health = p.getHealth();
                 Arrow arrow = new Arrow(level, start.x, start.y, start.z, new ItemStack(Items.ARROW), new ItemStack(Items.BOW));
                 arrow.setDeltaMovement(velocity);
@@ -868,7 +884,7 @@ public final class LitematicaRecoveryAcceptanceScenario {
                 Vec3 actualVelocity=arrow.getDeltaMovement(); long spawnTick=server.getTickCount();
                 ArrowOperation spawned = new ArrowOperation(operation.id(), operation.token(), operation.playerId(),
                         operation.root(), uuid, entityId, operation.startedIn());
-                double closestTime=(p.getZ()-start.z)/velocity.z;
+                double closestTime=horizontalTimeToPlayer(p, start, velocity);
                 Minecraft.getInstance().execute(() -> {
                     if (!clientCanAcceptSpawn(spawned)) {
                         server.execute(() -> discardArrowIfSame(server, spawned));
@@ -1490,8 +1506,14 @@ public final class LitematicaRecoveryAcceptanceScenario {
         }
         return false;
     }
+    /** Time until the arrow is level with the player along its horizontal direction of travel. */
+    private static double horizontalTimeToPlayer(ServerPlayer player, Vec3 start, Vec3 velocity) {
+        double speedSq = velocity.x * velocity.x + velocity.z * velocity.z;
+        return ((player.getX() - start.x) * velocity.x + (player.getZ() - start.z) * velocity.z) / speedSq;
+    }
+
     private static void verifyArrowTrajectory(ServerLevel level, ServerPlayer player, Vec3 start, Vec3 velocity) {
-        double horizontalTime = (player.getZ() - start.z) / velocity.z;
+        double horizontalTime = horizontalTimeToPlayer(player, start, velocity);
         double gravity = ProjectileHelper.ARROW_GRAVITY_ACCEL;
         double closestY = start.y + velocity.y * horizontalTime - 0.5 * gravity * horizontalTime * horizontalTime;
         double verticalOffset = Math.abs(closestY - player.getY());
@@ -1507,9 +1529,12 @@ public final class LitematicaRecoveryAcceptanceScenario {
             double t=Math.min(tick,horizontalTime);
             Vec3 next = new Vec3(start.x + velocity.x*t, start.y + velocity.y*t - 0.5*gravity*t*t,
                     start.z + velocity.z*t);
-            if (level.clip(new ClipContext(previous, next, ClipContext.Block.COLLIDER,
-                    ClipContext.Fluid.NONE, player)).getType() != HitResult.Type.MISS)
-                throw new IllegalStateException("ballistic arrow corridor obstructed at tick " + tick);
+            BlockHitResult hit = level.clip(new ClipContext(previous, next, ClipContext.Block.COLLIDER,
+                    ClipContext.Fluid.NONE, player));
+            if (hit.getType() != HitResult.Type.MISS)
+                throw new IllegalStateException("ballistic arrow corridor obstructed at tick " + tick
+                        + " by " + level.getBlockState(hit.getBlockPos()) + " at " + hit.getBlockPos().toShortString()
+                        + " (player " + player.blockPosition().toShortString() + ", start " + start + ")");
             previous=next;
         }
     }

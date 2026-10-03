@@ -97,8 +97,8 @@ public class InventorySubTracker extends Tracker {
         List<Slot> result = new ArrayList<>();
         // First add fillable slots
         for (Slot toCheckStackable : list.getOrDefault(item.getItem(), Collections.emptyList())) {
-            // Ignore cursor slot.
-            if (Slot.isCursor(toCheckStackable))
+            // Ignore cursor slot and the 2x2 crafting grid (it isn't meant for storage).
+            if (Slot.isCursor(toCheckStackable) || isPlayerCraftingGridSlot(toCheckStackable))
                 continue;
             ItemStack stackToAddTo = StorageHelper.getItemStackInSlot(toCheckStackable);
             // We must have SOME room left, then we decide whether we care about having ENOUGH.
@@ -118,8 +118,9 @@ public class InventorySubTracker extends Tracker {
                 if (airSlot.equals(CursorSlot.SLOT))
                     continue;
                 int windowCheck = airSlot.getWindowSlot();
-                // ignore 2x2 crafting grid -- it isn't meant for storage
-                if(windowCheck>=1 && windowCheck <=4){
+                // ignore 2x2 crafting grid -- it isn't meant for storage. Window slots 1-4 are
+                // ordinary storage in other menus such as chests.
+                if (isPlayerCraftingGridSlot(airSlot)) {
                     continue;
                 }
                 // Special case: Armor/shield, we wish to ignore these slots our inventory is not open.
@@ -129,6 +130,11 @@ public class InventorySubTracker extends Tracker {
             }
         }
         return result;
+    }
+
+    static boolean isPlayerCraftingGridSlot(Slot slot) {
+        int window = slot.getWindowSlot();
+        return slot instanceof PlayerSlot && window >= 1 && window <= 4;
     }
 
     static boolean canFitInExistingStack(int roomLeft, int requestedCount, boolean acceptPartial) {

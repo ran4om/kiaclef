@@ -66,9 +66,13 @@ public abstract class ResourceTask extends Task implements ITaskCanForce {
         return StorageHelper.itemTargetsMetAccessibleInventory(mod, _itemTargets) && !hasLeftoverPlayerGridItems();
     }
 
-    /** Leftover ingredients in the 2x2 grid only return to the inventory when a screen closes, which the bot never does. */
+    /**
+     * Leftover ingredients in the 2x2 grid (or on the cursor while clearing it) only return to the
+     * inventory when a screen closes, which the bot never does.
+     */
     protected static boolean hasLeftoverPlayerGridItems() {
         if (!StorageHelper.isPlayerInventoryOpen()) return false;
+        if (!StorageHelper.getItemStackInCursorSlot().isEmpty()) return true;
         for (Slot slot : PlayerSlot.CRAFT_INPUT_SLOTS) {
             if (!StorageHelper.getItemStackInSlot(slot).isEmpty()) return true;
         }
