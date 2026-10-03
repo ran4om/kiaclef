@@ -12,14 +12,14 @@ import adris.altoclef.tasks.movement.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.Dimension;
 import adris.altoclef.util.helpers.WorldHelper;
-import net.minecraft.block.Blocks;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.mob.BlazeEntity;
-import net.minecraft.item.Items;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.monster.Blaze;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.ClipContext;
 
 import java.util.Optional;
 
@@ -43,7 +43,7 @@ public class CollectBlazeRodsTask extends ResourceTask {
 
     private static boolean isHoveringAboveLavaOrTooHigh(AltoClef mod, Entity entity) {
         int MAX_HEIGHT = 23;
-        for (BlockPos check = entity.getBlockPos(); entity.getBlockPos().getY() - check.getY() < MAX_HEIGHT; check = check.down()) {
+        for (BlockPos check = entity.blockPosition(); entity.blockPosition().getY() - check.getY() < MAX_HEIGHT; check = check.below()) {
             if (mod.getWorld().getBlockState(check).getBlock() == Blocks.LAVA) return true;
             if (WorldHelper.isSolid(mod, check)) return false;
         }
@@ -66,26 +66,26 @@ public class CollectBlazeRodsTask extends ResourceTask {
 
         Optional<Entity> toKill = Optional.empty();
         // If there is a blaze, kill it.
-        if (mod.getEntityTracker().entityFound(BlazeEntity.class)) {
+        if (mod.getEntityTracker().entityFound(Blaze.class)) {
 
             // If we're in danger and there are too many blazes, run away.
-            if (mod.getEntityTracker().getTrackedEntities(BlazeEntity.class).size() >= TOO_MANY_BLAZES && mod.getPlayer().getHealth() <= TOO_LITTLE_HEALTH_BLAZE) {
+            if (mod.getEntityTracker().getTrackedEntities(Blaze.class).size() >= TOO_MANY_BLAZES && mod.getPlayer().getHealth() <= TOO_LITTLE_HEALTH_BLAZE) {
                 setDebugState("Running away as there are too many blazes nearby.");
                 return new TimeoutWanderTask();
             }
 
-            toKill = mod.getEntityTracker().getClosestEntity(mod.getPlayer().getPos(), BlazeEntity.class);
+            toKill = mod.getEntityTracker().getClosestEntity(mod.getPlayer().position(), Blaze.class);
 
             if (_foundBlazeSpawner != null && toKill.isPresent()) {
                 Entity kill = toKill.get();
-                Vec3d nearest = kill.getPos();
+                Vec3 nearest = kill.position();
 
-                double sqDistanceToPlayer = nearest.squaredDistanceTo(mod.getPlayer().getPos());//_foundBlazeSpawner.getX(), _foundBlazeSpawner.getY(), _foundBlazeSpawner.getZ());
+                double sqDistanceToPlayer = nearest.distanceToSqr(mod.getPlayer().position());//_foundBlazeSpawner.getX(), _foundBlazeSpawner.getY(), _foundBlazeSpawner.getZ());
                 // Ignore if the blaze is too far away.
                 if (sqDistanceToPlayer > SPAWNER_BLAZE_RADIUS * SPAWNER_BLAZE_RADIUS) {
                     // If the blaze can see us it needs to go lol
-                    BlockHitResult hit = mod.getWorld().raycast(new RaycastContext(mod.getPlayer().getCameraPosVec(1.0F), kill.getCameraPosVec(1.0F), RaycastContext.ShapeType.OUTLINE, RaycastContext.FluidHandling.NONE, mod.getPlayer()));
-                    if (hit != null && hit.getBlockPos().getSquaredDistance(mod.getPlayer().getPos()) < sqDistanceToPlayer) {
+                    BlockHitResult hit = mod.getWorld().clip(new ClipContext(mod.getPlayer().getEyePosition(1.0F), kill.getEyePosition(1.0F), ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, mod.getPlayer()));
+                    if (hit != null && hit.getBlockPos().distToCenterSqr(mod.getPlayer().position()) < sqDistanceToPlayer) {
                         toKill = Optional.empty();
                     }
                 }
@@ -94,7 +94,7 @@ public class CollectBlazeRodsTask extends ResourceTask {
 
         if (toKill.isPresent() && toKill.get().isAlive()) {
             setDebugState("Killing blaze");
-            return new KillEntitiesTask(entity -> !isHoveringAboveLavaOrTooHigh(mod, entity), BlazeEntity.class);
+            return new KillEntitiesTask(entity -> !isHoveringAboveLavaOrTooHigh(mod, entity), Blaze.class);
         }
 
 
@@ -106,9 +106,9 @@ public class CollectBlazeRodsTask extends ResourceTask {
 
         // If we have a blaze spawner, go near it.
         if (_foundBlazeSpawner != null) {
-            if (!_foundBlazeSpawner.isWithinDistance(mod.getPlayer().getPos(), 4)) {
+            if (!_foundBlazeSpawner.closerToCenterThan(mod.getPlayer().position(), 4)) {
                 setDebugState("Going to blaze spawner");
-                return new GetToBlockTask(_foundBlazeSpawner.up(), false);
+                return new GetToBlockTask(_foundBlazeSpawner.above(), false);
             } else {
 
                 // Put out fire that might mess with us.
@@ -142,7 +142,7 @@ public class CollectBlazeRodsTask extends ResourceTask {
             return false;
             //return pos.isWithinDistance(mod.getPlayer().getPos(),3000);
         }
-        return WorldHelper.getSpawnerEntity(mod, pos) instanceof BlazeEntity;
+        return WorldHelper.getSpawnerEntity(mod, pos) instanceof Blaze;
     }
 
     @Override

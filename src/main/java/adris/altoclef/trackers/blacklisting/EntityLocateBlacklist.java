@@ -1,11 +1,11 @@
 package adris.altoclef.trackers.blacklisting;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
 
 public class EntityLocateBlacklist extends AbstractObjectBlacklist<Entity> {
     @Override
-    protected Vec3d getPos(Entity item) {
-        return item.getPos();
+    protected Vec3 getPos(Entity item) {
+        return item.position();
     }
 }

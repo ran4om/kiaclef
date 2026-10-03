@@ -1,7 +1,7 @@
 package adris.altoclef.tasks.entity;
 
 import adris.altoclef.AltoClef;
-import net.minecraft.entity.Entity;
+import net.minecraft.world.entity.Entity;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -37,6 +37,6 @@ public class KillEntityTask extends AbstractKillEntityTask {
 
     @Override
     protected String toDebugString() {
-        return "Killing " + _target.getType().getTranslationKey();
+        return "Killing " + _target.getType().getDescriptionId();
     }
 }

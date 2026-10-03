@@ -4,9 +4,9 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.movement.GetToBlockTask;
 import adris.altoclef.tasks.movement.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.core.BlockPos;
 
 import java.util.Optional;
 
@@ -42,13 +42,13 @@ public class ExampleTask2 extends Task {
         }
 
         if (mod.getBlockTracker().anyFound(Blocks.OAK_LOG)) {
-            Optional<BlockPos> nearest = mod.getBlockTracker().getNearestTracking(mod.getPlayer().getPos(), Blocks.OAK_LOG);
+            Optional<BlockPos> nearest = mod.getBlockTracker().getNearestTracking(mod.getPlayer().position(), Blocks.OAK_LOG);
             if (nearest.isPresent()) {
                 // Figure out leaves
                 BlockPos check = new BlockPos(nearest.get());
                 while (mod.getWorld().getBlockState(check).getBlock() == Blocks.OAK_LOG ||
                         mod.getWorld().getBlockState(check).getBlock() == Blocks.OAK_LEAVES) {
-                    check = check.up();
+                    check = check.above();
                 }
                 _target = check;
             }
@@ -72,7 +72,7 @@ public class ExampleTask2 extends Task {
     @Override
     public boolean isFinished(AltoClef mod) {
         if (_target != null) {
-            return mod.getPlayer().getBlockPos().equals(_target);
+            return mod.getPlayer().blockPosition().equals(_target);
         }
         return super.isFinished(mod);
     }

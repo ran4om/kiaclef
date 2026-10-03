@@ -2,32 +2,37 @@ package adris.altoclef.util.slots;
 
 public class ChestSlot extends Slot {
 
-    private final boolean _big;
+    private final int _containerSlots;
 
     public ChestSlot(int slot, boolean big) {
         this(slot, big, false);
     }
 
     public ChestSlot(int slot, boolean big, boolean inventory) {
+        this(slot, big ? 6 : 3, inventory);
+    }
+
+    public ChestSlot(int slot, int rows, boolean inventory) {
         super(slot, inventory);
-        _big = big;
+        if (rows < 1 || rows > 6) throw new IllegalArgumentException("Chest rows must be between 1 and 6");
+        _containerSlots = rows * 9;
     }
 
     @Override
     public int inventorySlotToWindowSlot(int inventorySlot) {
         if (inventorySlot < 9) {
-            return inventorySlot + (_big ? 81 : 54);
+            return inventorySlot + (_containerSlots + 27);
         }
-        return (inventorySlot - 9) + (_big ? 54 : 27);
+        return (inventorySlot - 9) + _containerSlots;
     }
 
     @Override
     protected int windowSlotToInventorySlot(int windowSlot) {
-        int bottomStart = (_big ? 81 : 54);
+        int bottomStart = (_containerSlots + 27);
         if (windowSlot >= bottomStart) {
             return windowSlot - bottomStart;
         }
-        return (windowSlot + 9) - (_big ? 54 : 27);
+        return (windowSlot + 9) - _containerSlots;
     }
 
     @Override

@@ -4,22 +4,27 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.eventbus.EventBus;
 import adris.altoclef.eventbus.Subscription;
 import adris.altoclef.eventbus.events.SlotClickChangedEvent;
+import adris.altoclef.trackers.storage.ContainerType;
 import adris.altoclef.util.ItemTarget;
-import adris.altoclef.util.slots.Slot;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import adris.altoclef.util.helpers.StorageHelper;
+import net.minecraft.world.level.block.Block;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Optional;
 import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
 
 public class ContainerStoredTracker {
     private final HashMap<Item, Integer> _totalDeposited = new HashMap<>();
-    private final Predicate<Slot> _acceptDeposit;
+    private final Predicate<SlotClickChangedEvent> _acceptDeposit;
 
     private Subscription<SlotClickChangedEvent> _slotClickChangedSubscription;
+    private boolean _tracking;
 
-    public ContainerStoredTracker(Predicate<Slot> acceptDeposit) {
+    public ContainerStoredTracker(Predicate<SlotClickChangedEvent> acceptDeposit) {
         _acceptDeposit = acceptDeposit;
     }
 
@@ -28,31 +33,57 @@ public class ContainerStoredTracker {
     }
 
     public void startTracking() {
+        if (_tracking) return;
         _slotClickChangedSubscription = EventBus.subscribe(SlotClickChangedEvent.class, evt -> {
-            Slot slot = evt.slot;
-            if (!slot.isSlotInPlayerInventory() && _acceptDeposit.test(slot)) {
-                ItemStack before = evt.before;
-                ItemStack after = evt.after;
+            if (shouldCountDeposit(evt.menu().getClass(), evt.playerInventorySlot(), _acceptDeposit.test(evt))) {
+                ItemStack before = evt.before();
+                ItemStack after = evt.after();
                 if (before.getItem() != after.getItem()) {
                     // Before has been replaced! We lost before and added all of after.
                     if (!before.isEmpty())
-                        trackChange(before.getItem(), -1 * before.getCount());
+                        recordChange(before.getItem(), -1 * before.getCount());
                     if (!after.isEmpty())
-                        trackChange(after.getItem(), after.getCount());
+                        recordChange(after.getItem(), after.getCount());
                 } else {
                     // Before and after are the same, track the difference.
-                    trackChange(after.getItem(), after.getCount() - before.getCount());
+                    recordChange(after.getItem(), after.getCount() - before.getCount());
                 }
             }
         });
+        _tracking = true;
+    }
+
+    static boolean shouldCountDeposit(Class<?> menuClass, boolean playerInventorySlot,
+                                      boolean acceptedByTask) {
+        return ContainerType.isStorageMenu(menuClass) && !playerInventorySlot && acceptedByTask;
+    }
+
+    static boolean isConfiguredContainerBlock(Block openedBlock, Block[] allowedBlocks) {
+        return Arrays.stream(allowedBlocks).anyMatch(block -> block == openedBlock);
+    }
+
+    static boolean acceptsBoundContainer(Optional<BlockPos> boundPosition,
+                                         Predicate<BlockPos> acceptsPosition) {
+        return boundPosition.filter(acceptsPosition).isPresent();
+    }
+
+    void recordChange(Item item, int delta) {
+        trackChange(item, delta);
+    }
+
+    void resetForNewRun() {
+        _totalDeposited.clear();
     }
 
     public void stopTracking() {
+        if (!_tracking) return;
         EventBus.unsubscribe(_slotClickChangedSubscription);
+        _slotClickChangedSubscription = null;
+        _tracking = false;
     }
 
     /**
-     * How many items have been ADDED to containers satisfying our conditions?
+     * How many client-predicted items have been added to containers satisfying our conditions?
      */
     public int getStoredCount(Item ...items) {
         int result = 0;
@@ -61,15 +92,29 @@ public class ContainerStoredTracker {
         }
         return result;
     }
+
+    static int remainingAvailableCount(int requestedCount, int storedCount, int availableCount) {
+        return Math.max(0, Math.min(requestedCount - storedCount, availableCount));
+    }
+
+    static int accessibleItemCount(int inventoryCount, int cursorCount, boolean cursorMatches) {
+        return inventoryCount + (cursorMatches ? cursorCount : 0);
+    }
+
     public boolean matches(ItemTarget target) {
         return getStoredCount(target.getMatches()) >= target.getTargetCount();
     }
 
     public ItemTarget[] getUnstoredItemTargetsYouCanStore(AltoClef mod, ItemTarget[] toStore) {
         return Arrays.stream(toStore)
-                .filter(target -> !matches(target) && mod.getItemStorage().hasItem(target.getMatches()))
-                // If we don't have enough, reduce the count to what we CAN add
-                .map(target -> mod.getItemStorage().getItemCount(target) < target.getTargetCount()? new ItemTarget(target, mod.getItemStorage().getItemCount(target)) : target)
+                .map(target -> {
+                    ItemStack cursor = StorageHelper.getItemStackInCursorSlot();
+                    int accessible = accessibleItemCount(mod.getItemStorage().getItemCount(target),
+                            cursor.getCount(), target.matches(cursor.getItem()));
+                    return new ItemTarget(target, remainingAvailableCount(
+                            target.getTargetCount(), getStoredCount(target.getMatches()), accessible));
+                })
+                .filter(target -> target.getTargetCount() > 0)
                 .toArray(ItemTarget[]::new);
     }
 }

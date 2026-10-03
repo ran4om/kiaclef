@@ -12,11 +12,11 @@ import adris.altoclef.util.time.TimerGame;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.item.Items;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.ClipContext;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -39,11 +39,11 @@ public class CollectObsidianTask extends ResourceTask {
     }
 
     private static BlockPos getLavaStructurePos(BlockPos lavaPos) {
-        return lavaPos.add(1, 1, 0);
+        return lavaPos.offset(1, 1, 0);
     }
 
     private static BlockPos getLavaWaterPos(BlockPos lavaPos) {
-        return lavaPos.up();
+        return lavaPos.above();
     }
 
     @Override
@@ -55,7 +55,7 @@ public class CollectObsidianTask extends ResourceTask {
     protected void onResourceStart(AltoClef mod) {
         mod.getBehaviour().push();
 
-        mod.getBehaviour().setRayTracingFluidHandling(RaycastContext.FluidHandling.SOURCE_ONLY);
+        mod.getBehaviour().setRayTracingFluidHandling(ClipContext.Fluid.SOURCE_ONLY);
 
         mod.getBlockTracker().trackBlock(Blocks.OBSIDIAN);
         //mod.getBlockTracker().trackBlock(Blocks.WATER);
@@ -77,14 +77,14 @@ public class CollectObsidianTask extends ResourceTask {
     }
 
     private static BlockPos getGoodObsidianPosition(AltoClef mod) {
-        BlockPos start = mod.getPlayer().getBlockPos().add(-3, -3, -3);
-        BlockPos end = mod.getPlayer().getBlockPos().add(3, 3, 3);
+        BlockPos start = mod.getPlayer().blockPosition().offset(-3, -3, -3);
+        BlockPos end = mod.getPlayer().blockPosition().offset(3, 3, 3);
         for (BlockPos pos : WorldHelper.scanRegion(mod, start, end)) {
             if (!WorldHelper.canBreak(mod, pos) || !WorldHelper.canPlace(mod, pos)) {
                 return null;
             }
         }
-        return mod.getPlayer().getBlockPos();
+        return mod.getPlayer().blockPosition();
     }
 
     @Override
@@ -106,7 +106,7 @@ public class CollectObsidianTask extends ResourceTask {
         }
 
         Predicate<BlockPos> goodObsidian = (blockPos ->
-                blockPos.isWithinDistance(mod.getPlayer().getPos(), 800)
+                blockPos.closerToCenterThan(mod.getPlayer().position(), 800)
                 && WorldHelper.canBreak(mod, blockPos)
         );
 
@@ -144,7 +144,7 @@ public class CollectObsidianTask extends ResourceTask {
             return new MineAndCollectTask(new ItemTarget(Items.OBSIDIAN, _count), new Block[]{Blocks.OBSIDIAN}, MiningRequirement.DIAMOND);
         }
 
-        if (!mod.getWorld().getDimension().isUltrawarm()) {
+        if (!mod.getWorld().environmentAttributes().getDimensionValue(net.minecraft.world.attribute.EnvironmentAttributes.WATER_EVAPORATES)) {
             setDebugState("We can't place water, so we're wandering.");
             return new TimeoutWanderTask();
         }
@@ -163,7 +163,7 @@ public class CollectObsidianTask extends ResourceTask {
         if (_placeObsidianTask != null && !mod.getItemStorage().hasItem(Items.LAVA_BUCKET)) {
             // We've moved sort of far away from our post, and this will STOP running when we grab our lava
             // (which is exactly when we want it to run and no more!
-            if (!_placeObsidianTask.getPos().isWithinDistance(mod.getPlayer().getPos(), 4)) {
+            if (!_placeObsidianTask.getPos().closerToCenterThan(mod.getPlayer().position(), 4)) {
                 BlockPos goodPos = getGoodObsidianPosition(mod);
                 if (goodPos != null) {
                     Debug.logMessage("(nudged obsidian target closer)");

@@ -1,9 +1,9 @@
 package adris.altoclef.control;
 
 import baritone.api.utils.input.Input;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.option.GameOptions;
-import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.Options;
+import net.minecraft.client.KeyMapping;
 
 import java.util.ArrayDeque;
 import java.util.HashSet;
@@ -25,18 +25,18 @@ public class InputControls {
     private final Queue<Input> _toUnpress = new ArrayDeque<>();
     private final Set<Input> _waitForRelease = new HashSet<>(); // a click requires a release.
 
-    private static KeyBinding inputToKeyBinding(Input input) {
-        GameOptions o = MinecraftClient.getInstance().options;
+    private static KeyMapping inputToKeyBinding(Input input) {
+        Options o = Minecraft.getInstance().options;
         return switch (input) {
-            case MOVE_FORWARD -> o.forwardKey;
-            case MOVE_BACK -> o.backKey;
-            case MOVE_LEFT -> o.leftKey;
-            case MOVE_RIGHT -> o.rightKey;
-            case CLICK_LEFT -> o.attackKey;
-            case CLICK_RIGHT -> o.useKey;
-            case JUMP -> o.jumpKey;
-            case SNEAK -> o.sneakKey;
-            case SPRINT -> o.sprintKey;
+            case MOVE_FORWARD -> o.keyUp;
+            case MOVE_BACK -> o.keyDown;
+            case MOVE_LEFT -> o.keyLeft;
+            case MOVE_RIGHT -> o.keyRight;
+            case CLICK_LEFT -> o.keyAttack;
+            case CLICK_RIGHT -> o.keyUse;
+            case JUMP -> o.keyJump;
+            case SNEAK -> o.keyShift;
+            case SPRINT -> o.keySprint;
             default -> throw new IllegalArgumentException("Invalid key input/not accounted for: " + input);
         };
     }
@@ -46,39 +46,39 @@ public class InputControls {
         if (_waitForRelease.contains(input)) {
             return;
         }
-        inputToKeyBinding(input).setPressed(true);
+        inputToKeyBinding(input).setDown(true);
         // Also necessary to ensure the game registers the input as "pressed"
-        KeyBinding.onKeyPressed(inputToKeyBinding(input).getDefaultKey());
+        KeyMapping.click(inputToKeyBinding(input).getDefaultKey());
         _toUnpress.add(input);
         _waitForRelease.add(input);
     }
 
     public void hold(Input input) {
-        if (!inputToKeyBinding(input).isPressed()) {
-            KeyBinding.onKeyPressed(inputToKeyBinding(input).getDefaultKey());
+        if (!inputToKeyBinding(input).isDown()) {
+            KeyMapping.click(inputToKeyBinding(input).getDefaultKey());
         }
-        inputToKeyBinding(input).setPressed(true);
+        inputToKeyBinding(input).setDown(true);
     }
 
     public void release(Input input) {
-        inputToKeyBinding(input).setPressed(false);
+        inputToKeyBinding(input).setDown(false);
     }
 
     public boolean isHeldDown(Input input) {
-        return inputToKeyBinding(input).isPressed();
+        return inputToKeyBinding(input).isDown();
     }
 
     public void forceLook(float yaw, float pitch) {
-        if (MinecraftClient.getInstance().player != null) {
-            MinecraftClient.getInstance().player.setYaw(yaw);
-            MinecraftClient.getInstance().player.setPitch(pitch);
+        if (Minecraft.getInstance().player != null) {
+            Minecraft.getInstance().player.setYRot(yaw);
+            Minecraft.getInstance().player.setXRot(pitch);
         }
     }
 
     // Before the user calls input commands for the frame
     public void onTickPre() {
         while (!_toUnpress.isEmpty()) {
-            inputToKeyBinding(_toUnpress.remove()).setPressed(false);
+            inputToKeyBinding(_toUnpress.remove()).setDown(false);
         }
     }
 

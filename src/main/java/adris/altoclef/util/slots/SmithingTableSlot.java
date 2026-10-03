@@ -1,10 +1,13 @@
 package adris.altoclef.util.slots;
 
+import net.minecraft.world.inventory.SmithingMenu;
+
 public class SmithingTableSlot extends Slot {
 
-    public static final SmithingTableSlot INPUT_SLOT_TOOL = new SmithingTableSlot(0);
-    public static final SmithingTableSlot INPUT_SLOT_MATERIALS = new SmithingTableSlot(1);
-    public static final SmithingTableSlot OUTPUT_SLOT = new SmithingTableSlot(2);
+    public static final SmithingTableSlot INPUT_SLOT_TEMPLATE = new SmithingTableSlot(SmithingMenu.TEMPLATE_SLOT);
+    public static final SmithingTableSlot INPUT_SLOT_TOOL = new SmithingTableSlot(SmithingMenu.BASE_SLOT);
+    public static final SmithingTableSlot INPUT_SLOT_MATERIALS = new SmithingTableSlot(SmithingMenu.ADDITIONAL_SLOT);
+    public static final SmithingTableSlot OUTPUT_SLOT = new SmithingTableSlot(SmithingMenu.RESULT_SLOT);
 
     public SmithingTableSlot(int slot) {
         this(slot, false);
@@ -15,17 +18,17 @@ public class SmithingTableSlot extends Slot {
     @Override
     public int inventorySlotToWindowSlot(int inventorySlot) {
         if (inventorySlot < 9) {
-            return inventorySlot + 30;
+            return inventorySlot + 31;
         }
-        return inventorySlot - 6;
+        return inventorySlot - 5;
     }
 
     @Override
     protected int windowSlotToInventorySlot(int windowSlot) {
-        if (windowSlot >= 30) {
-            return windowSlot - 30;
+        if (windowSlot >= 31) {
+            return windowSlot - 31;
         }
-        return windowSlot + 6;
+        return windowSlot + 5;
     }
 
     @Override

@@ -8,8 +8,8 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.trackers.storage.ContainerCache;
 import adris.altoclef.trackers.storage.ContainerType;
 import adris.altoclef.util.helpers.WorldHelper;
-import net.minecraft.block.Block;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.core.BlockPos;
 
 import java.util.Optional;
 
@@ -38,16 +38,14 @@ public abstract class AbstractDoToStorageContainerTask extends Task {
 
         BlockPos targetPos = containerTarget.get();
 
-        // We're open
-        if (_currentContainerType != null && ContainerType.screenHandlerMatches(_currentContainerType)) {
-
-            // Optional<BlockPos> lastInteracted = mod.getItemStorage().getLastBlockPosInteraction();
-            //if (lastInteracted.isPresent() && lastInteracted.get().equals(targetPos)) {
-                Optional<ContainerCache> cache = mod.getItemStorage().getContainerAtPosition(targetPos);
-                if (cache.isPresent()) {
-                    return onContainerOpenSubtask(mod, cache.get());
-                }
-            //}
+        // Only act on the exact block bound to the currently open menu.
+        Optional<BlockPos> openPosition = mod.getItemStorage().getLastBlockPosInteraction();
+        if (_currentContainerType != null && ContainerType.screenHandlerMatches(_currentContainerType)
+                && openPosition.filter(targetPos::equals).isPresent()) {
+            Optional<ContainerCache> cache = mod.getItemStorage().getContainerAtPosition(targetPos);
+            if (cache.isPresent()) {
+                return onContainerOpenSubtask(mod, cache.get());
+            }
         }
 
         // Get to the container
@@ -55,9 +53,9 @@ public abstract class AbstractDoToStorageContainerTask extends Task {
             Block type = mod.getWorld().getBlockState(targetPos).getBlock();
             _currentContainerType = ContainerType.getFromBlock(type);
         }
-        if (WorldHelper.isChest(mod, targetPos) && WorldHelper.isSolid(mod, targetPos.up()) && WorldHelper.canBreak(mod, targetPos.up())) {
+        if (WorldHelper.isChest(mod, targetPos) && WorldHelper.isSolid(mod, targetPos.above()) && WorldHelper.canBreak(mod, targetPos.above())) {
             setDebugState("Clearing block above chest");
-            return new DestroyBlockTask(targetPos.up());
+            return new DestroyBlockTask(targetPos.above());
         }
         setDebugState("Opening container: " + targetPos.toShortString());
         return new InteractWithBlockTask(targetPos);

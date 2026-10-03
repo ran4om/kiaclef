@@ -12,9 +12,9 @@ import adris.altoclef.tasks.movement.TimeoutWanderTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.ItemHelper;
-import net.minecraft.block.Block;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.ArrayDeque;
@@ -59,7 +59,7 @@ public class ReplaceBlocksTask extends Task {
 
         //_forceReplace.clear();
         _blockBrokenSubscription = EventBus.subscribe(BlockBrokenEvent.class, evt -> {
-            if (evt.player.equals(MinecraftClient.getInstance().player)) {
+            if (evt.player.equals(Minecraft.getInstance().player)) {
                 if (isWithinRange(evt.blockPos)) {
                     boolean wasAReplacable = ArrayUtils.contains(_toFind, evt.blockState.getBlock());
                     if (wasAReplacable) {

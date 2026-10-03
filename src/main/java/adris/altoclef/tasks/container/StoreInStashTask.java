@@ -9,9 +9,10 @@ import adris.altoclef.trackers.storage.ContainerCache;
 import adris.altoclef.util.BlockRange;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.ItemHelper;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.util.math.BlockPos;
+import adris.altoclef.util.helpers.StorageHelper;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.core.BlockPos;
 
 import java.util.Arrays;
 import java.util.Optional;
@@ -26,6 +27,7 @@ public class StoreInStashTask extends Task {
     private final BlockRange _stashRange;
 
     private ContainerStoredTracker _storedItems;
+    private Task _activeContainerTask;
 
     // There's a lot of code duplication here...
     private static final Block[] TO_SCAN = Stream.concat(Arrays.stream(new Block[]{Blocks.CHEST, Blocks.TRAPPED_CHEST, Blocks.BARREL}), Arrays.stream(ItemHelper.itemsToBlocks(ItemHelper.SHULKER_BOXES))).toArray(Block[]::new);
@@ -41,15 +43,28 @@ public class StoreInStashTask extends Task {
         mod.getBlockTracker().trackBlock(TO_SCAN);
         if (_storedItems == null) {
             _storedItems = new ContainerStoredTracker(slot -> {
-                Optional<BlockPos> currentContainer = mod.getItemStorage().getLastBlockPosInteraction();
-                return currentContainer.isPresent() && _stashRange.contains(currentContainer.get());
+                Optional<BlockPos> currentContainer = mod.getItemStorage().getContainerPositionForMenu(slot.menu());
+                return ContainerStoredTracker.acceptsBoundContainer(currentContainer, position -> {
+                    if (!_stashRange.contains(position)) return false;
+                    Block openedBlock = mod.getWorld().getBlockState(position).getBlock();
+                    return ContainerStoredTracker.isConfiguredContainerBlock(openedBlock, TO_SCAN);
+                });
             });
         }
         _storedItems.startTracking();
+        _activeContainerTask = null;
     }
 
     @Override
     protected Task onTick(AltoClef mod) {
+        if (ContainerDepositCompletion.shouldFinish(mod, _storedItems, _toStore, _getIfNotPresent)) {
+            return ContainerDepositCompletion.isClean()
+                    ? null
+                    : ContainerDepositCompletion.cleanupTask(mod);
+        }
+        if (!StorageHelper.getItemStackInCursorSlot().isEmpty() && _activeContainerTask != null) {
+            return _activeContainerTask;
+        }
         // Get more if we don't have & "get if not present" is true.
         if (_getIfNotPresent) {
             for (ItemTarget target : _toStore) {
@@ -71,11 +86,12 @@ public class StoreInStashTask extends Task {
         // Store in valid container
         if (mod.getBlockTracker().anyFound(validContainer, TO_SCAN)) {
             setDebugState("Storing in closest stash container");
-            return new DoToClosestBlockTask(
+            _activeContainerTask = new DoToClosestBlockTask(
                     (BlockPos bpos) -> new StoreInContainerTask(bpos, false, _storedItems.getUnstoredItemTargetsYouCanStore(mod, _toStore)),
                     validContainer,
                     TO_SCAN
             );
+            return _activeContainerTask;
         }
 
         setDebugState("Traveling to stash (no non-full containers in stash range found)");
@@ -90,8 +106,20 @@ public class StoreInStashTask extends Task {
     }
 
     @Override
+    protected void onResetForNewRun() {
+        if (_storedItems != null) {
+            _storedItems.stopTracking();
+            _storedItems.resetForNewRun();
+        }
+    }
+
+    @Override
     public boolean isFinished(AltoClef mod) {
-        return _storedItems != null && _storedItems.getUnstoredItemTargetsYouCanStore(mod, _toStore).length == 0;
+        return ContainerDepositCompletion.isComplete(
+                ContainerDepositCompletion.shouldFinish(mod, _storedItems, _toStore, _getIfNotPresent),
+                StorageHelper.getItemStackInCursorSlot().isEmpty(),
+                ContainerDepositCompletion.craftingGridEmpty(),
+                StorageHelper.isPlayerInventoryOpen());
     }
 
     @Override

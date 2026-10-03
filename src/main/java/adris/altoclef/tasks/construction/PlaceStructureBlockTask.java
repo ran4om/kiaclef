@@ -1,7 +1,7 @@
 package adris.altoclef.tasks.construction;
 
-import net.minecraft.block.Block;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.core.BlockPos;
 
 /**
  * Place any throwaway block at a position

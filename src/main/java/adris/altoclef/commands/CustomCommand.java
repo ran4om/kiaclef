@@ -1,9 +1,7 @@
 package adris.altoclef.commands;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.Settings;
 import adris.altoclef.commandsystem.*;
-import adris.altoclef.tasks.speedrun.BeatMinecraftConfig;
 import adris.altoclef.util.helpers.ConfigHelper;
 
 import java.util.Arrays;
@@ -25,8 +23,6 @@ public class CustomCommand extends Command {
 
     @Override
     protected void call(AltoClef mod, ArgParser parser) throws CommandException {
-        CustomTaskConfig dupliate = _ctc;
-
         String customCommand = parser.get(String.class);
 
         StringBuilder commandToExecute = new StringBuilder();
@@ -59,9 +55,13 @@ public class CustomCommand extends Command {
                     commandToExecute.append(Arrays.toString(_ctc.customTasks[commandIndex].tasks[i].parameters[0]).replaceAll("\\[", "").replaceAll("]", ""));
                 }
             }
-            AltoClef.getCommandExecutor().execute(mod.getModSettings().getCommandPrefix() + commandToExecute.toString().replaceAll(",", "").replaceAll("\\?", ","));
-        }else{
-
+            AltoClef.getCommandExecutor().execute(
+                    mod.getModSettings().getCommandPrefix() + commandToExecute.toString().replaceAll(",", "").replaceAll("\\?", ","),
+                    this::finish,
+                    exception -> mod.logWarning(exception.getMessage()));
+        } else {
+            logError("Unknown custom task: " + customCommand);
+            finish();
         }
     }
 }

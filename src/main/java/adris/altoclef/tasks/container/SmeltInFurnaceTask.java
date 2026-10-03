@@ -1,7 +1,6 @@
 package adris.altoclef.tasks.container;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.Debug;
 import adris.altoclef.TaskCatalogue;
 import adris.altoclef.tasks.ResourceTask;
 import adris.altoclef.tasks.container.SmeltInFurnaceTask.DoSmeltInFurnaceTask;
@@ -16,18 +15,19 @@ import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.FurnaceSlot;
 import adris.altoclef.util.slots.Slot;
-import net.minecraft.block.Blocks;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.screen.FurnaceScreenHandler;
-import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.inventory.AbstractFurnaceMenu;
+import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.core.BlockPos;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.ToIntFunction;
 import java.util.stream.Stream;
 
 
@@ -41,13 +41,16 @@ public class SmeltInFurnaceTask extends ResourceTask {
 
     private final SmeltTarget[] _targets;
 
-    private final DoSmeltInFurnaceTask _doTask;
+    private final DoSmeltInFurnaceTask[] _doTasks;
+    private boolean _ignoreMaterials;
 
     public SmeltInFurnaceTask(SmeltTarget[] targets) {
         super(extractItemTargets(targets));
+        if (targets.length == 0) {
+            throw new IllegalArgumentException("At least one smelt target is required");
+        }
         _targets = targets;
-        // TODO: Do them in order.
-        _doTask = new DoSmeltInFurnaceTask(targets[0]);
+        _doTasks = Arrays.stream(targets).map(DoSmeltInFurnaceTask::new).toArray(DoSmeltInFurnaceTask[]::new);
     }
 
     public SmeltInFurnaceTask(SmeltTarget target) {
@@ -63,7 +66,8 @@ public class SmeltInFurnaceTask extends ResourceTask {
     }
 
     public void ignoreMaterials() {
-        _doTask.ignoreMaterials();
+        _ignoreMaterials = true;
+        Arrays.stream(_doTasks).forEach(DoSmeltInFurnaceTask::ignoreMaterials);
     }
 
     @Override
@@ -72,21 +76,33 @@ public class SmeltInFurnaceTask extends ResourceTask {
     }
 
     @Override
-    protected void onResourceStart(AltoClef mod) {
-        if (_targets.length != 1) {
-            Debug.logWarning("Tried smelting multiple targets, only one target is supported at a time!");
+    protected Task onTick(AltoClef mod) {
+        ItemStack cursor = StorageHelper.getItemStackInCursorSlot();
+        if (!cursor.isEmpty() && matchesAnyTargetOutput(_targets, cursor.getItem())) {
+            Optional<Slot> destination = mod.getItemStorage()
+                    .getSlotThatCanFitInPlayerInventory(cursor, false);
+            if (destination.isPresent()) {
+                setDebugState("Returning partial smelt output from cursor");
+                return new ClickSlotTask(destination.get());
+            }
+            setDebugState("Freeing inventory for smelt output");
+            return new EnsureFreeInventorySlotTask();
         }
-        mod.getBehaviour().push();
-        mod.getBehaviour().markSlotAsConversionSlot(FurnaceSlot.INPUT_SLOT_MATERIALS, stack -> {
-            // Eventually do multiple targets
-            return _targets[0].getMaterial().matches(stack.getItem());
-        });
+        return super.onTick(mod);
+    }
+
+    @Override
+    protected void onResourceStart(AltoClef mod) {
+        mod.getBehaviour().markSlotAsConversionSlot(FurnaceSlot.INPUT_SLOT_MATERIALS,
+                stack -> matchesAnyTargetMaterial(_targets, stack.getItem()));
         mod.getBehaviour().markSlotAsConversionSlot(FurnaceSlot.INPUT_SLOT_FUEL, stack -> ItemHelper.isFuel(stack.getItem()));
     }
 
     @Override
     protected Task onResourceTick(AltoClef mod) {
-        return _doTask;
+        int nextTarget = firstIncompleteTargetIndex(_targets,
+                target -> StorageHelper.getAccessibleInventoryItemCount(mod, target));
+        return nextTarget < 0 ? null : _doTasks[nextTarget];
     }
 
     @Override
@@ -96,25 +112,114 @@ public class SmeltInFurnaceTask extends ResourceTask {
     }
 
     @Override
+    protected void onResetForNewRun() {
+        for (DoSmeltInFurnaceTask task : _doTasks) {
+            task.restartForNewRun();
+        }
+    }
+
+    @Override
     public boolean isFinished(AltoClef mod) {
-        return super.isFinished(mod) || _doTask.isFinished(mod);
+        // A multi-target request is complete only when every output is available in
+        // the player's accessible inventory. `ignoreMaterials` changes fuel planning
+        // for furnace contents; it never waives an output target.
+        return super.isFinished(mod);
     }
 
     @Override
     protected boolean isEqualResource(ResourceTask other) {
         if (other instanceof SmeltInFurnaceTask task) {
-            return task._doTask.isEqual(_doTask);
+            return task._ignoreMaterials == _ignoreMaterials && Arrays.equals(task._targets, _targets);
         }
         return false;
     }
 
     @Override
     protected String toDebugStringName() {
-        return _doTask.toDebugString();
+        return "Smelting " + Arrays.toString(extractItemTargets(_targets));
     }
 
     public SmeltTarget[] getTargets() {
         return _targets;
+    }
+
+    static int firstIncompleteTargetIndex(SmeltTarget[] targets, ToIntFunction<ItemTarget> inventoryCount) {
+        for (int i = 0; i < targets.length; i++) {
+            ItemTarget output = targets[i].getItem();
+            if (inventoryCount.applyAsInt(output) < output.getTargetCount()) return i;
+        }
+        return -1;
+    }
+
+    static boolean matchesAnyTargetMaterial(SmeltTarget[] targets, Item item) {
+        for (SmeltTarget target : targets) {
+            if (target.getMaterial().matches(item)
+                    || Arrays.stream(target.getOptionalMaterials()).anyMatch(optional -> optional == item)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean matchesAnyTargetOutput(SmeltTarget[] targets, Item item) {
+        for (SmeltTarget target : targets) {
+            if (target.getItem().matches(item)) return true;
+        }
+        return false;
+    }
+
+    static boolean shouldCollectFuelNow(boolean furnaceAcquired, double inventoryFuel, double fuelNeeded) {
+        return shouldCollectFuelNow(furnaceAcquired, inventoryFuel, fuelNeeded, false);
+    }
+
+    static boolean shouldCollectFuelNow(boolean furnaceAcquired, double inventoryFuel,
+                                        double fuelNeeded, boolean fuelTransferPending) {
+        return furnaceAcquired && !fuelTransferPending && inventoryFuel < fuelNeeded;
+    }
+
+    static boolean isSlotTransferAcknowledged(int requestedItems, int sourceItemsRemoved,
+                                              double requiredDestinationAmount,
+                                              double receivedDestinationAmount,
+                                              boolean cursorEmpty) {
+        return hasReceivedExpectedTransfer(requestedItems, sourceItemsRemoved,
+                requiredDestinationAmount, receivedDestinationAmount) && cursorEmpty;
+    }
+
+    static boolean hasReceivedExpectedTransfer(int requestedItems, int sourceItemsRemoved,
+                                               double requiredDestinationAmount,
+                                               double receivedDestinationAmount) {
+        return requestedItems > 0 && sourceItemsRemoved >= requestedItems
+                // Furnace burn time is reported in whole ticks (1/200 of a smelt).
+                // The first tick can consume fuel between insertion and our first
+                // observation, so allow exactly that bounded quantization loss.
+                && receivedDestinationAmount + (1.0 / 200.0) + 1.0e-6 >= requiredDestinationAmount;
+    }
+
+    static boolean hasFuelCapacityIncrease(boolean receiptPreviouslyObserved,
+                                           double previousCapacity, double currentCapacity) {
+        return receiptPreviouslyObserved || currentCapacity > previousCapacity + 1.0e-3;
+    }
+
+    static double observedFuelTransferReceipt(double initialFuelCapacity, double currentFuelCapacity,
+                                             int initialOutputCount, int currentOutputCount,
+                                             double initialCookProgress, double currentCookProgress) {
+        return Math.max(0, currentFuelCapacity - initialFuelCapacity
+                + currentOutputCount - initialOutputCount
+                + currentCookProgress - initialCookProgress);
+    }
+
+    static int materialTransferReceipt(int initialInputCount, int currentInputCount,
+                                       int initialOutputCount, int currentOutputCount) {
+        return Math.max(0, currentInputCount + currentOutputCount
+                - initialInputCount - initialOutputCount);
+    }
+
+    static ItemTarget materialSlotTransferTarget(ItemTarget materialTarget, int neededMaterialsInSlot) {
+        return new ItemTarget(materialTarget, neededMaterialsInSlot);
+    }
+
+    static boolean shouldAcquireFurnace(boolean furnaceOpen, boolean furnaceAlreadyAcquired) {
+        return !furnaceOpen && !furnaceAlreadyAcquired;
     }
 
     @SuppressWarnings("ConditionCoveredByFurtherCondition")
@@ -122,6 +227,11 @@ public class SmeltInFurnaceTask extends ResourceTask {
 
         private final SmeltTarget _target;
         private boolean _ignoreMaterials;
+        private boolean _furnaceAlreadyAcquired;
+        // Preserve an in-flight inventory -> cursor -> furnace transfer across
+        // parent ticks and menu close/reopen cycles.
+        private FurnaceTransferSpec _pendingTransferSpec;
+        private PendingFurnaceSlotTransferTask _pendingTransferTask;
 
         private FurnaceCache _furnaceCache = new FurnaceCache();
 
@@ -138,6 +248,21 @@ public class SmeltInFurnaceTask extends ResourceTask {
         }
 
         @Override
+        protected void onStart(AltoClef mod) {
+            super.onStart(mod);
+            _furnaceAlreadyAcquired = false;
+        }
+
+        @Override
+        protected void onResetForNewRun() {
+            super.onResetForNewRun();
+            _furnaceAlreadyAcquired = false;
+            _pendingTransferSpec = null;
+            _pendingTransferTask = null;
+            _furnaceCache = new FurnaceCache();
+        }
+
+        @Override
         protected boolean isSubTaskEqual(DoStuffInContainerTask other) {
             if (other instanceof DoSmeltInFurnaceTask task) {
                 return task._target.equals(_target) && task._ignoreMaterials == _ignoreMaterials;
@@ -147,12 +272,32 @@ public class SmeltInFurnaceTask extends ResourceTask {
 
         @Override
         protected boolean isContainerOpen(AltoClef mod) {
-            return (mod.getPlayer().currentScreenHandler instanceof FurnaceScreenHandler);
+            return (mod.getPlayer().containerMenu instanceof AbstractFurnaceMenu);
         }
 
         @Override
         protected Task onTick(AltoClef mod) {
             tryUpdateOpenFurnace(mod);
+
+            // Slot transfers are a critical section: physical fuel temporarily
+            // leaves inventory while it is held on the cursor. Resume the same
+            // task before resource collection or other furnace planning can replace it.
+            if (_pendingTransferSpec != null) {
+                if (!isContainerOpen(mod)) {
+                    _pendingTransferTask = null;
+                    setDebugState("Reopening furnace to finish slot transfer");
+                    return super.onTick(mod);
+                }
+                PendingFurnaceSlotTransferTask transfer = getPendingTransferTask(mod);
+                if (transfer.isFinished(mod)) {
+                    _pendingTransferSpec = null;
+                    _pendingTransferTask = null;
+                } else {
+                    setDebugState("Finishing " + (_pendingTransferSpec.fuel() ? "fuel" : "material") + " transfer");
+                    return transfer;
+                }
+            }
+
             // Include both regular + optional items
             ItemTarget materialTarget = _allMaterials;
             ItemTarget outputTarget = _target.getItem();
@@ -179,8 +324,19 @@ public class SmeltInFurnaceTask extends ResourceTask {
                 return getMaterialTask(_target.getMaterial());
             }
 
+            // Establish the furnace before recursively collecting fuel. A fuel route can
+            // itself need a pickaxe and crafting table; asking for fuel first lets that
+            // nested crafting work continually preempt container acquisition.
+            boolean furnaceOpen = isContainerOpen(mod);
+            if (furnaceOpen) _furnaceAlreadyAcquired = true;
+            if (shouldAcquireFurnace(furnaceOpen, _furnaceAlreadyAcquired)) {
+                return super.onTick(mod);
+            }
+
             // We don't have enough fuel...
-            if (StorageHelper.calculateInventoryFuelCount(mod) < fuelNeeded) {
+            if (shouldCollectFuelNow(_furnaceAlreadyAcquired,
+                    CollectFuelTask.getAccessibleInventoryFuelCapacity(mod), fuelNeeded,
+                    false)) {
                 setDebugState("Getting Fuel");
                 return new CollectFuelTask(fuelNeeded);
             }
@@ -219,6 +375,11 @@ public class SmeltInFurnaceTask extends ResourceTask {
             ItemStack material = StorageHelper.getItemStackInSlot(FurnaceSlot.INPUT_SLOT_MATERIALS);
             ItemStack fuel     = StorageHelper.getItemStackInSlot(FurnaceSlot.INPUT_SLOT_FUEL);
 
+            if (_pendingTransferSpec != null) {
+                setDebugState("Resuming furnace slot transfer");
+                return getPendingTransferTask(mod);
+            }
+
             // Receive from output if present
             if (!output.isEmpty()) {
                 setDebugState("Receiving Output");
@@ -234,7 +395,7 @@ public class SmeltInFurnaceTask extends ResourceTask {
                     }
                 }
                 // Pick up
-                return new ClickSlotTask(FurnaceSlot.OUTPUT_SLOT, SlotActionType.PICKUP);
+                return new ClickSlotTask(FurnaceSlot.OUTPUT_SLOT, ContainerInput.PICKUP);
                 // return new MoveItemToSlotTask(new ItemTarget(output.getItem(), output.getCount()), toMoveTo.get(), mod -> FurnaceSlot.OUTPUT_SLOT);
             }
 
@@ -247,9 +408,11 @@ public class SmeltInFurnaceTask extends ResourceTask {
                     - (_target.getItem().matches(output.getItem()) ? output.getCount() : 0);
             // We don't have the right material or we need more
             if (!_allMaterials.matches(material.getItem()) || neededMaterialsInSlot > material.getCount()) {
-                int materialsAlreadyIn = (materialTarget.matches(material.getItem()) ? material.getCount() : 0);
                 setDebugState("Moving Materials");
-                return new MoveItemToSlotFromInventoryTask(new ItemTarget(materialTarget, neededMaterialsInSlot - materialsAlreadyIn), FurnaceSlot.INPUT_SLOT_MATERIALS);
+                _pendingTransferSpec = new FurnaceTransferSpec(
+                        materialSlotTransferTarget(materialTarget, neededMaterialsInSlot),
+                        FurnaceSlot.INPUT_SLOT_MATERIALS, _target.getItem(), false);
+                return getPendingTransferTask(mod);
             }
 
             /*
@@ -287,7 +450,10 @@ public class SmeltInFurnaceTask extends ResourceTask {
                     }
                     if (bestStack != null) {
                         setDebugState("Filling fuel");
-                        return new MoveItemToSlotFromInventoryTask(new ItemTarget(bestStack.getItem(), bestStack.getCount()), FurnaceSlot.INPUT_SLOT_FUEL);
+                        _pendingTransferSpec = new FurnaceTransferSpec(
+                                new ItemTarget(bestStack.getItem(), bestStack.getCount()),
+                                FurnaceSlot.INPUT_SLOT_FUEL, _target.getItem(), true);
+                        return getPendingTransferTask(mod);
                     }
                 }
             }
@@ -331,6 +497,160 @@ public class SmeltInFurnaceTask extends ResourceTask {
                 _furnaceCache.outputSlot = StorageHelper.getItemStackInSlot(FurnaceSlot.OUTPUT_SLOT);
             }
         }
+
+        private PendingFurnaceSlotTransferTask getPendingTransferTask(AltoClef mod) {
+            int menuId = mod.getPlayer().containerMenu.containerId;
+            if (_pendingTransferTask == null || _pendingTransferTask.getMenuId() != menuId) {
+                _pendingTransferTask = new PendingFurnaceSlotTransferTask(_pendingTransferSpec, menuId);
+            }
+            return _pendingTransferTask;
+        }
+
+        private record FurnaceTransferSpec(ItemTarget target, Slot destination,
+                                           ItemTarget producedOutput, boolean fuel,
+                                           TransferProgress progress) {
+            private FurnaceTransferSpec(ItemTarget target, Slot destination,
+                                        ItemTarget producedOutput, boolean fuel) {
+                this(target, destination, producedOutput, fuel, new TransferProgress());
+            }
+        }
+
+        private static final class TransferProgress {
+            private boolean snapshotInitialized;
+            private int baselineInventoryCount;
+            private int initialCursorCount;
+            private int initialDestinationCount;
+            private int requiredItemCount;
+            private int baselineOutputCount;
+            private double baselineCookProgress;
+            private double baselineFuelCapacity;
+            private double lastFuelCapacity;
+            private double maxDestinationReceipt;
+        }
+
+        private final class PendingFurnaceSlotTransferTask extends MoveItemToSlotFromInventoryTask {
+            private final FurnaceTransferSpec _spec;
+            private final int _menuId;
+            private final TransferProgress _progress;
+
+            private PendingFurnaceSlotTransferTask(FurnaceTransferSpec spec, int menuId) {
+                super(spec.target(), spec.destination());
+                _spec = spec;
+                _menuId = menuId;
+                _progress = spec.progress();
+            }
+
+            private int getMenuId() {
+                return _menuId;
+            }
+
+            @Override
+            protected boolean isEqual(Task other) {
+                return other instanceof PendingFurnaceSlotTransferTask task
+                        && task._menuId == _menuId && task._spec.equals(_spec);
+            }
+
+            @Override
+            protected void onStart(AltoClef mod) {
+                super.onStart(mod);
+                if (_progress.snapshotInitialized) return;
+                _progress.snapshotInitialized = true;
+                ItemStack destination = StorageHelper.getItemStackInSlot(_spec.destination());
+                _progress.initialDestinationCount = _spec.target().matches(destination.getItem()) ? destination.getCount() : 0;
+                _progress.requiredItemCount = Math.max(0, _spec.target().getTargetCount() - _progress.initialDestinationCount);
+                _progress.baselineInventoryCount = StorageHelper.getAccessibleInventoryItemCount(mod, _spec.target());
+                ItemStack cursor = StorageHelper.getItemStackInCursorSlot();
+                _progress.initialCursorCount = _spec.target().matches(cursor.getItem()) ? cursor.getCount() : 0;
+                _progress.baselineFuelCapacity = getFuelCapacityInFurnace(destination)
+                        + Math.max(0, StorageHelper.getFurnaceFuel());
+                _progress.baselineOutputCount = countProducedOutput(mod);
+                _progress.baselineCookProgress = StorageHelper.getFurnaceCookPercent();
+                _progress.baselineFuelCapacity += _progress.baselineOutputCount + _progress.baselineCookProgress;
+                _progress.lastFuelCapacity = _progress.baselineFuelCapacity;
+            }
+
+            @Override
+            protected Task onTick(AltoClef mod) {
+                observeDestinationReceipt(mod);
+                if (hasReceivedExpectedTransfer(mod)) {
+                    ItemStack cursor = StorageHelper.getItemStackInCursorSlot();
+                    if (!cursor.isEmpty()) {
+                        Optional<Slot> toMove = mod.getItemStorage()
+                                .getSlotThatCanFitInPlayerInventory(cursor, false)
+                                .or(() -> StorageHelper.getGarbageSlot(mod));
+                        if (toMove.isPresent()) return new ClickSlotTask(toMove.get());
+                        return new EnsureFreeInventorySlotTask();
+                    }
+                }
+                return super.onTick(mod);
+            }
+
+            @Override
+            public boolean isFinished(AltoClef mod) {
+                if (!_progress.snapshotInitialized || mod.getPlayer() == null
+                        || mod.getPlayer().containerMenu.containerId != _menuId
+                        || !isContainerOpen(mod)) return false;
+                observeDestinationReceipt(mod);
+                if (!StorageHelper.getItemStackInCursorSlot().isEmpty()) return false;
+                return hasReceivedExpectedTransfer(mod);
+            }
+
+            private void observeDestinationReceipt(AltoClef mod) {
+                if (!_progress.snapshotInitialized || mod.getPlayer() == null
+                        || mod.getPlayer().containerMenu.containerId != _menuId
+                        || !isContainerOpen(mod)) return;
+                if (_spec.fuel()) {
+                    ItemStack fuel = StorageHelper.getItemStackInSlot(_spec.destination());
+                    double currentCapacity = getFuelCapacityInFurnace(fuel)
+                            + Math.max(0, StorageHelper.getFurnaceFuel());
+                    int currentOutputCount = countProducedOutput(mod);
+                    double currentTotalCapacity = currentCapacity + currentOutputCount
+                            + StorageHelper.getFurnaceCookPercent();
+                    _progress.maxDestinationReceipt += observedFuelTransferReceipt(
+                            _progress.lastFuelCapacity, currentTotalCapacity, 0, 0, 0, 0);
+                    _progress.lastFuelCapacity = currentTotalCapacity;
+                } else {
+                    ItemStack input = StorageHelper.getItemStackInSlot(_spec.destination());
+                    int inputCount = _spec.target().matches(input.getItem()) ? input.getCount() : 0;
+                    _progress.maxDestinationReceipt = Math.max(_progress.maxDestinationReceipt,
+                            materialTransferReceipt(_progress.initialDestinationCount, inputCount,
+                                    _progress.baselineOutputCount, countProducedOutput(mod)));
+                }
+            }
+
+            private boolean hasReceivedExpectedTransfer(AltoClef mod) {
+                if (_progress.requiredItemCount == 0) {
+                    ItemStack destination = StorageHelper.getItemStackInSlot(_spec.destination());
+                    return _spec.target().matches(destination.getItem())
+                            && destination.getCount() >= _spec.target().getTargetCount();
+                }
+                int currentInventoryCount = StorageHelper.getAccessibleInventoryItemCount(mod, _spec.target());
+                ItemStack cursor = StorageHelper.getItemStackInCursorSlot();
+                int currentCursorCount = _spec.target().matches(cursor.getItem()) ? cursor.getCount() : 0;
+                int sourceItemsRemoved = Math.max(0, _progress.baselineInventoryCount - currentInventoryCount)
+                        + Math.max(0, _progress.initialCursorCount - currentCursorCount);
+                double requiredReceipt = _spec.fuel()
+                        ? _progress.requiredItemCount * ItemHelper.getFuelAmount(_spec.target().getMatches()[0])
+                        : _progress.requiredItemCount;
+                // Receipt and source removal determine whether excess cursor items can be
+                // returned. Cursor emptiness is a separate final completion condition.
+                return SmeltInFurnaceTask.hasReceivedExpectedTransfer(_progress.requiredItemCount, sourceItemsRemoved,
+                        requiredReceipt, _progress.maxDestinationReceipt);
+            }
+
+            private int countProducedOutput(AltoClef mod) {
+                if (_spec.producedOutput() == null) return 0;
+                int count = mod.getItemStorage().getItemCountInventoryOnly(_spec.producedOutput().getMatches());
+                ItemStack output = StorageHelper.getItemStackInSlot(FurnaceSlot.OUTPUT_SLOT);
+                if (_spec.producedOutput().matches(output.getItem())) count += output.getCount();
+                return count;
+            }
+
+            private double getFuelCapacityInFurnace(ItemStack fuel) {
+                return fuel.isEmpty() ? 0 : ItemHelper.getFuelAmount(fuel.getItem()) * fuel.getCount();
+            }
+        }
+
     }
 
     static class FurnaceCache {

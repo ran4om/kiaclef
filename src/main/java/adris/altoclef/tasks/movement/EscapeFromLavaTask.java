@@ -6,9 +6,9 @@ import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import baritone.api.pathing.goals.Goal;
 import baritone.api.utils.input.Input;
 import baritone.pathing.movement.MovementHelper;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
 
 public class EscapeFromLavaTask extends CustomBaritoneGoalTask {
 
@@ -36,7 +36,7 @@ public class EscapeFromLavaTask extends CustomBaritoneGoalTask {
     @Override
     protected Task onTick(AltoClef mod) {
         // Sprint through lava + jump, it's faster
-        if (mod.getPlayer().isInLava() || mod.getWorld().getBlockState(mod.getPlayer().getBlockPos().down()).getBlock() == Blocks.LAVA) {
+        if (mod.getPlayer().isInLava() || mod.getWorld().getBlockState(mod.getPlayer().blockPosition().below()).getBlock() == Blocks.LAVA) {
             mod.getInputControls().hold(Input.JUMP);
             mod.getInputControls().hold(Input.SPRINT);
         }
@@ -73,15 +73,15 @@ public class EscapeFromLavaTask extends CustomBaritoneGoalTask {
     private class EscapeFromLavaGoal implements Goal {
 
         private static boolean isLava(int x, int y, int z) {
-            if (MinecraftClient.getInstance().world == null) return false;
-            return MovementHelper.isLava(MinecraftClient.getInstance().world.getBlockState(new BlockPos(x, y, z)));
+            if (Minecraft.getInstance().level == null) return false;
+            return MovementHelper.isLava(Minecraft.getInstance().level.getBlockState(new BlockPos(x, y, z)));
         }
         private static boolean isLavaAdjacent(int x, int y, int z) {
             return isLava(x+1,y,z) || isLava(x-1,y,z) || isLava(x,y,z+1) || isLava(x,y,z-1);
         }
         private static boolean isWater(int x, int y, int z) {
-            if (MinecraftClient.getInstance().world == null) return false;
-            return MovementHelper.isWater(MinecraftClient.getInstance().world.getBlockState(new BlockPos(x, y, z)));
+            if (Minecraft.getInstance().level == null) return false;
+            return MovementHelper.isWater(Minecraft.getInstance().level.getBlockState(new BlockPos(x, y, z)));
         }
 
         @Override

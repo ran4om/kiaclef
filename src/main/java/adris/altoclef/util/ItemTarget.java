@@ -3,7 +3,7 @@ package adris.altoclef.util;
 import adris.altoclef.Debug;
 import adris.altoclef.TaskCatalogue;
 import adris.altoclef.util.helpers.ItemHelper;
-import net.minecraft.item.Item;
+import net.minecraft.world.item.Item;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -152,7 +152,7 @@ public class ItemTarget {
                 if (item == null) {
                     result.append("(null??)");
                 } else {
-                    result.append(ItemHelper.trimItemName(item.getTranslationKey()));
+                    result.append(ItemHelper.trimItemName(item.getDescriptionId()));
                 }
                 if (++counter != _itemMatches.length) {
                     result.append(",");

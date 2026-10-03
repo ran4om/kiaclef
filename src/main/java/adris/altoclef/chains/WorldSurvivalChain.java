@@ -12,13 +12,13 @@ import adris.altoclef.util.helpers.LookHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
-import net.minecraft.block.AbstractFireBlock;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.item.Items;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.level.block.BaseFireBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 
 import java.util.Optional;
 
@@ -60,15 +60,15 @@ public class WorldSurvivalChain extends SingleTaskChain {
 
         // Extinguish with water
         if (mod.getModSettings().shouldExtinguishSelfWithWater()) {
-            if (!(_mainTask instanceof EscapeFromLavaTask && isCurrentlyRunning(mod)) && mod.getPlayer().isOnFire() && !mod.getPlayer().hasStatusEffect(StatusEffects.FIRE_RESISTANCE) && !mod.getWorld().getDimension().isUltrawarm()) {
+            if (!(_mainTask instanceof EscapeFromLavaTask && isCurrentlyRunning(mod)) && mod.getPlayer().isOnFire() && !mod.getPlayer().hasEffect(MobEffects.FIRE_RESISTANCE) && !mod.getWorld().environmentAttributes().getDimensionValue(net.minecraft.world.attribute.EnvironmentAttributes.WATER_EVAPORATES)) {
                 // Extinguish ourselves
                 if (mod.getItemStorage().hasItem(Items.WATER_BUCKET)) {
-                    BlockPos targetWaterPos = mod.getPlayer().getBlockPos();
-                    if (WorldHelper.isSolid(mod, targetWaterPos.down()) && WorldHelper.canPlace(mod, targetWaterPos)) {
-                        Optional<Rotation> reach = LookHelper.getReach(targetWaterPos.down(), Direction.UP);
+                    BlockPos targetWaterPos = mod.getPlayer().blockPosition();
+                    if (WorldHelper.isSolid(mod, targetWaterPos.below()) && WorldHelper.canPlace(mod, targetWaterPos)) {
+                        Optional<Rotation> reach = LookHelper.getReach(targetWaterPos.below(), Direction.UP);
                         if (reach.isPresent()) {
                             mod.getClientBaritone().getLookBehavior().updateTarget(reach.get(), true);
-                            if (mod.getClientBaritone().getPlayerContext().isLookingAt(targetWaterPos.down())) {
+                            if (mod.getClientBaritone().getPlayerContext().isLookingAt(targetWaterPos.below())) {
                                 if (mod.getSlotHandler().forceEquipItem(Items.WATER_BUCKET)) {
                                     _extinguishWaterPosition = targetWaterPos;
                                     mod.getInputControls().tryPress(Input.CLICK_RIGHT);
@@ -83,7 +83,7 @@ public class WorldSurvivalChain extends SingleTaskChain {
                 return 90;
             } else if (mod.getItemStorage().hasItem(Items.BUCKET) && _extinguishWaterPosition != null && mod.getBlockTracker().blockIsValid(_extinguishWaterPosition, Blocks.WATER)) {
                 // Pick up the water
-                setTask(new InteractWithBlockTask(new ItemTarget(Items.BUCKET, 1), Direction.UP, _extinguishWaterPosition.down(), true));
+                setTask(new InteractWithBlockTask(new ItemTarget(Items.BUCKET, 1), Direction.UP, _extinguishWaterPosition.below(), true));
                 return 60;
             } else {
                 _extinguishWaterPosition = null;
@@ -114,7 +114,7 @@ public class WorldSurvivalChain extends SingleTaskChain {
         boolean avoidedDrowning = false;
         if (mod.getModSettings().shouldAvoidDrowning()) {
             if (!mod.getClientBaritone().getPathingBehavior().isPathing()) {
-                if (mod.getPlayer().isTouchingWater() && mod.getPlayer().getAir() < mod.getPlayer().getMaxAir()) {
+                if (mod.getPlayer().isInWater() && mod.getPlayer().getAirSupply() < mod.getPlayer().getMaxAirSupply()) {
                     // Swim up!
                     mod.getInputControls().hold(Input.JUMP);
                     //mod.getClientBaritone().getInputOverrideHandler().setInputForceState(Input.JUMP, true);
@@ -132,17 +132,17 @@ public class WorldSurvivalChain extends SingleTaskChain {
     }
 
     private boolean isInLavaOhShit(AltoClef mod) {
-        if (mod.getPlayer().isInLava() && !mod.getPlayer().hasStatusEffect(StatusEffects.FIRE_RESISTANCE)) {
+        if (mod.getPlayer().isInLava() && !mod.getPlayer().hasEffect(MobEffects.FIRE_RESISTANCE)) {
             _wasInLavaTimer.reset();
             return true;
         }
         return mod.getPlayer().isOnFire() && !_wasInLavaTimer.elapsed();
     }
     private boolean isInFire(AltoClef mod) {
-        if (mod.getPlayer().isOnFire() && !mod.getPlayer().hasStatusEffect(StatusEffects.FIRE_RESISTANCE)) {
+        if (mod.getPlayer().isOnFire() && !mod.getPlayer().hasEffect(MobEffects.FIRE_RESISTANCE)) {
             for (BlockPos pos : WorldHelper.getBlocksTouchingPlayer(mod)) {
                 Block b = mod.getWorld().getBlockState(pos).getBlock();
-                if (b instanceof AbstractFireBlock) {
+                if (b instanceof BaseFireBlock) {
                     return true;
                 }
             }
@@ -151,7 +151,13 @@ public class WorldSurvivalChain extends SingleTaskChain {
     }
 
     private boolean isStuckInNetherPortal(AltoClef mod) {
-        return WorldHelper.isInNetherPortal(mod) && !mod.getUserTaskChain().getCurrentTask().thisOrChildSatisfies(task -> task instanceof EnterNetherPortalTask);
+        return shouldShimmyOutOfNetherPortal(
+                WorldHelper.isInNetherPortal(mod), mod.getUserTaskChain().getCurrentTask());
+    }
+
+    static boolean shouldShimmyOutOfNetherPortal(boolean inNetherPortal, adris.altoclef.tasksystem.Task currentTask) {
+        return inNetherPortal && (currentTask == null
+                || !currentTask.thisOrChildSatisfies(task -> task instanceof EnterNetherPortalTask));
     }
 
     @Override

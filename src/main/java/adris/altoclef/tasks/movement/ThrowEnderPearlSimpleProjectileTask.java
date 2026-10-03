@@ -8,10 +8,10 @@ import adris.altoclef.util.helpers.ProjectileHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
-import net.minecraft.entity.projectile.thrown.EnderPearlEntity;
-import net.minecraft.item.Items;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownEnderpearl;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 public class ThrowEnderPearlSimpleProjectileTask extends Task {
 
@@ -33,7 +33,7 @@ public class ThrowEnderPearlSimpleProjectileTask extends Task {
     @Override
     protected Task onTick(AltoClef mod) {
         // TODO: Unlikely/minor nitpick, but there could be other people throwing ender pearls, which would delay the bot.
-        if (mod.getEntityTracker().entityFound(EnderPearlEntity.class)) {
+        if (mod.getEntityTracker().entityFound(ThrownEnderpearl.class)) {
             _thrownTimer.reset();
         }
         if (_thrownTimer.elapsed()) {
@@ -76,14 +76,14 @@ public class ThrowEnderPearlSimpleProjectileTask extends Task {
     private static boolean cleanThrow(AltoClef mod, float yaw, float pitch) {
         Rotation rotation = new Rotation(yaw, -1 * pitch);
         float range = 3f;
-        Vec3d delta = LookHelper.toVec3d(rotation).multiply(range);
-        Vec3d start = LookHelper.getCameraPos(mod);
+        Vec3 delta = LookHelper.toVec3d(rotation).scale(range);
+        Vec3 start = LookHelper.getCameraPos(mod);
         return LookHelper.cleanLineOfSight(start.add(delta), range);
     }
 
     private static Rotation calculateThrowLook(AltoClef mod, BlockPos end) {
-        Vec3d start = ProjectileHelper.getThrowOrigin(mod.getPlayer());
-        Vec3d endCenter = WorldHelper.toVec3d(end);
+        Vec3 start = ProjectileHelper.getThrowOrigin(mod.getPlayer());
+        Vec3 endCenter = WorldHelper.toVec3d(end);
         double gravity = ProjectileHelper.THROWN_ENTITY_GRAVITY_ACCEL;
         double speed = 1.5;
         float yaw = LookHelper.getLookRotation(mod, end).getYaw();

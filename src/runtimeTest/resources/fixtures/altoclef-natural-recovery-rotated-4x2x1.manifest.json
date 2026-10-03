@@ -1,0 +1,289 @@
+{
+  "canonicalEmptyChestPayload": {
+    "NBT": "{id:\"minecraft:chest\",x:2,y:0,z:0,Items:[]}",
+    "coordinateSpace": "region-local authored coordinate; expected placed chest entity remains empty."
+  },
+  "compatibilityUncertainty": [
+    "The official 26.2 MinecraftDataVersion was not established from local mod metadata; 0 follows the existing MultiBuildAcceptanceScenario writer precedent.",
+    "The coordinate oracle below was corrected against Litematica 0.28.8 PositionUtils.getTransformedBlockPos bytecode, but native fixture loading, Baritone's active snapshot, and final server block-state placement remain to be verified in the packaged runtime."
+  ],
+  "fixture": "altoclef-natural-recovery-rotated-4x2x1.litematic",
+  "format": {
+    "litematicVersion": 7,
+    "minecraftDataVersion": 0,
+    "minecraftDataVersionNote": "Pinned to the harness writer precedent (MinecraftDataVersion=0); this generic marker is accepted by current project adapter policy but is not asserted to be the official 26.2 data-version number.",
+    "subVersion": 1
+  },
+  "generation": {
+    "generator": "one-off inline Python; no runtime harness mutation or random values",
+    "method": "Deterministic NBT construction with Python nbtlib 2.0.4; gzip-compressed big-endian NBT; fixed metadata timestamps; palette indices packed contiguously, least-significant bits first, two bits per entry."
+  },
+  "independentOracleRelativeToOrigin": [
+    {
+      "source": [
+        0,
+        0,
+        0
+      ],
+      "sourceRegion": "Materials",
+      "state": "minecraft:oak_planks",
+      "worldOffset": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "source": [
+        1,
+        0,
+        0
+      ],
+      "sourceRegion": "Materials",
+      "state": "minecraft:cobblestone",
+      "worldOffset": [
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "blockEntity": {
+        "Items": [],
+        "id": "minecraft:chest",
+        "worldPosition": "origin + [0,0,2]"
+      },
+      "source": [
+        2,
+        0,
+        0
+      ],
+      "sourceRegion": "Materials",
+      "state": "minecraft:chest[facing=east,type=single,waterlogged=false]",
+      "worldOffset": [
+        0,
+        0,
+        2
+      ]
+    },
+    {
+      "acceptanceNote": "Must begin with a naturally occurring occupied block and end AIR.",
+      "source": [
+        3,
+        0,
+        0
+      ],
+      "sourceRegion": "Materials",
+      "state": "minecraft:air",
+      "worldOffset": [
+        0,
+        0,
+        3
+      ]
+    },
+    {
+      "source": [
+        0,
+        1,
+        0
+      ],
+      "sourceRegion": "Lights",
+      "state": "minecraft:torch",
+      "worldOffset": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "source": [
+        1,
+        1,
+        0
+      ],
+      "sourceRegion": "Lights",
+      "state": "minecraft:torch",
+      "worldOffset": [
+        0,
+        1,
+        1
+      ]
+    },
+    {
+      "source": [
+        2,
+        1,
+        0
+      ],
+      "sourceRegion": "Lights",
+      "state": "minecraft:air",
+      "worldOffset": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "source": [
+        3,
+        1,
+        0
+      ],
+      "sourceRegion": "Lights",
+      "state": "minecraft:air",
+      "worldOffset": [
+        0,
+        1,
+        3
+      ]
+    }
+  ],
+  "metadata": {
+    "author": "AltoClef acceptance fixture",
+    "enclosingSize": [
+      4,
+      2,
+      1
+    ],
+    "name": "AltoClef natural recovery rotated fixture",
+    "regionCount": 2,
+    "timeCreated": 0,
+    "timeModified": 0,
+    "totalBlocks": 5,
+    "totalVolume": 8
+  },
+  "modVersions": {
+    "litematica": "0.28.8 (run/mods/litematica-fabric-26.2-0.28.8.jar; sha256=6de0774f78aee1698154dc7e7fa3c3afb19201e3d9474ddaf073fa4f4309a064)",
+    "malilib": "0.29.6 (run/mods/malilib-fabric-26.2-0.29.6.jar; sha256=db49040123d8dfe725a95407b4e777383e7162656045bff38ff72fc570080600)",
+    "minecraft": "26.2"
+  },
+  "placement": {
+    "active": true,
+    "mirror": "NONE",
+    "originRule": "Read and pin the numeric active Litematica placement origin before issuing @build; it is the rotation anchor. For this fixture only, the authored Z extent is zero and CLOCKWISE_90 maps (x,y,0) to (0,y,x), so the anchor also equals the transformed bounding-box minimum. All oracle coordinates are relative to that origin; add O componentwise. Do not infer the origin from the adapter snapshot under test.",
+    "resultingDimensions": [
+      1,
+      2,
+      4
+    ],
+    "rotation": "CLOCKWISE_90 around Y",
+    "transform": "Litematica 0.28.8 PositionUtils.getTransformedBlockPos applies CLOCKWISE_90 as (-z,y,x). For each authored global coordinate (x,y,z) in this fixture and placement origin O=(Ox,Oy,Oz), expected world coordinate is O+(-z,y,x); because all authored z coordinates are 0, offsets are (0,y,x). The transformed X minimum is 0, so no translation is required. +X maps to +Z.",
+    "unrotatedDimensions": [
+      4,
+      2,
+      1
+    ]
+  },
+  "regions": [
+    {
+      "cells": [
+        {
+          "source": [
+            0,
+            0,
+            0
+          ],
+          "state": "minecraft:oak_planks"
+        },
+        {
+          "source": [
+            1,
+            0,
+            0
+          ],
+          "state": "minecraft:cobblestone"
+        },
+        {
+          "blockEntity": {
+            "Items": [],
+            "id": "minecraft:chest",
+            "x": 2,
+            "y": 0,
+            "z": 0
+          },
+          "source": [
+            2,
+            0,
+            0
+          ],
+          "state": "minecraft:chest[facing=north,type=single,waterlogged=false]"
+        },
+        {
+          "source": [
+            3,
+            0,
+            0
+          ],
+          "state": "minecraft:air"
+        }
+      ],
+      "coordinateOrder": "increasing local X at Y=0,Z=0",
+      "name": "Materials",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "size": [
+        4,
+        1,
+        1
+      ]
+    },
+    {
+      "cells": [
+        {
+          "source": [
+            0,
+            1,
+            0
+          ],
+          "state": "minecraft:torch"
+        },
+        {
+          "source": [
+            1,
+            1,
+            0
+          ],
+          "state": "minecraft:torch"
+        },
+        {
+          "source": [
+            2,
+            1,
+            0
+          ],
+          "state": "minecraft:air"
+        },
+        {
+          "source": [
+            3,
+            1,
+            0
+          ],
+          "state": "minecraft:air"
+        }
+      ],
+      "coordinateOrder": "increasing local X at Y=1,Z=0",
+      "name": "Lights",
+      "position": [
+        0,
+        1,
+        0
+      ],
+      "size": [
+        4,
+        1,
+        1
+      ]
+    }
+  ],
+  "schema": "altoclef-litematic-fixture-manifest/v1",
+  "sha256": "0d13a49ff50addc3cb18cbff515b446886538e13b3d651a191db774a7c85937c",
+  "verification": {
+    "independentDecode": "After writing, reopen with nbtlib (separate pass) and independently decode all palette/index cells, NBT metadata and chest payload; verify SHA-256.",
+    "loaderAcceptance": "UNVERIFIED: actual Litematica native loader acceptance, active placement transform, and state transform require root to package/run the candidate in Minecraft 26.2. This artifact generation is not gameplay evidence.",
+    "rotationOracleEvidence": "Installed run/mods/litematica-fabric-26.2-0.28.8.jar inspected with javap -p -c: PositionUtils.getTransformedBlockPos switch case 1 constructs BlockPos(-z,y,x); Rotation.CLOCKWISE_90 maps to switch case 1. This corrects the original erroneous coordinate formula, which mapped +X to -Z."
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "altoclef_runtime_test",
+  "version": "0.5.0-runtime-test",
+  "name": "AltoClef Runtime Acceptance Harness",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "adris.altoclef.runtimetest.RuntimeAcceptanceMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "26.2",
+    "fabric-api": ">=0.154.2",
+    "altoclef": "*"
+  },
+  "mixins": [
+    "altoclef-runtime.mixins.json"
+  ]
+}

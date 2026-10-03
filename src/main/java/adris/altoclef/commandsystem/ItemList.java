@@ -20,7 +20,7 @@ public class ItemList {
             HashMap<String, Integer> items = new HashMap<>();
             for (String part : parts) {
                 part = part.trim();
-                String[] itemQuantityPair = part.split(" ");
+                String[] itemQuantityPair = part.split("\\s+");
                 if (itemQuantityPair.length > 2 || itemQuantityPair.length <= 0) {
                     // Must be either "item count" or "item"
                     throw new CommandException("Resource array element must be either \"item count\" or \"item\", but \"" + part + "\"" + " has " + itemQuantityPair.length + " parts.");
@@ -34,6 +34,7 @@ public class ItemList {
                         throw new CommandException("Failed to parse count for array element \"" + part + "\".");
                     }
                 }
+                if (count <= 0) throw new CommandException("Resource count must be positive: " + part);
                 if (TaskCatalogue.taskExists(item)) {
                     items.put(item, items.getOrDefault(item, 0) + count);
                 } else {
@@ -45,7 +46,7 @@ public class ItemList {
             }
         } else {
             // We must be of type "item <?count>"
-            String[] items = line.split(" ");
+            String[] items = line.split("\\s+");
             if (items.length >= 1) {
                 String name = items[0];
                 if (!TaskCatalogue.taskExists(name)) {
@@ -61,6 +62,7 @@ public class ItemList {
                 } else if (items.length > 2) {
                     throw new CommandException("Invalid item argument structure: Must be of form `<item>` or `<item> <count>`");
                 }
+                if (count <= 0) throw new CommandException("Resource count must be positive: " + line);
                 return new ItemList(new ItemTarget[] {new ItemTarget(name, count)});
             }
         }

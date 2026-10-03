@@ -8,8 +8,8 @@ import adris.altoclef.commandsystem.Command;
 import adris.altoclef.commandsystem.CommandException;
 import adris.altoclef.ui.MessagePriority;
 import adris.altoclef.util.helpers.ItemHelper;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.HashMap;
 
@@ -25,8 +25,8 @@ public class InventoryCommand extends Command {
             // Print inventory
             // Get item counts
             HashMap<String, Integer> counts = new HashMap<>();
-            for (int i = 0; i < mod.getPlayer().getInventory().size(); ++i) {
-                ItemStack stack = mod.getPlayer().getInventory().getStack(i);
+            for (int i = 0; i < mod.getPlayer().getInventory().getContainerSize(); ++i) {
+                ItemStack stack = mod.getPlayer().getInventory().getItem(i);
                 if (!stack.isEmpty()) {
                     String name = ItemHelper.stripItemName(stack.getItem());
                     if (!counts.containsKey(name)) counts.put(name, 0);

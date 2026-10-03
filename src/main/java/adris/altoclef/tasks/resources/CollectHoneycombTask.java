@@ -10,10 +10,10 @@ import adris.altoclef.tasks.squashed.CataloguedResourceTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.WorldHelper;
-import net.minecraft.block.Blocks;
-import net.minecraft.item.Items;
-import net.minecraft.state.property.Properties;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.core.BlockPos;
 
 import java.util.Optional;
 
@@ -61,14 +61,14 @@ public class CollectHoneycombTask extends ResourceTask {
                 return new CataloguedResourceTask(new ItemTarget(Items.CAMPFIRE, 1));
             }
             setDebugState("Placing campfire");
-            return new PlaceBlockTask(_nest.down(2), Blocks.CAMPFIRE);
+            return new PlaceBlockTask(_nest.below(2), Blocks.CAMPFIRE);
         }
         if (!mod.getItemStorage().hasItemInventoryOnly(Items.SHEARS)) {
             setDebugState("Getting shears");
             return new CataloguedResourceTask(new ItemTarget(Items.SHEARS, 1));
         }
-        if (mod.getWorld().getBlockState(_nest).get(Properties.HONEY_LEVEL) != 5) {
-            if (!_nest.isWithinDistance(mod.getPlayer().getPos(), 20)) {
+        if (mod.getWorld().getBlockState(_nest).getValue(BlockStateProperties.LEVEL_HONEY) != 5) {
+            if (!_nest.closerToCenterThan(mod.getPlayer().position(), 20)) {
                 setDebugState("Getting close to nest");
                 return new GetCloseToBlockTask(_nest);
             }
@@ -100,7 +100,7 @@ public class CollectHoneycombTask extends ResourceTask {
     }
 
     private boolean isCampfireUnderNest(AltoClef mod, BlockPos pos) {
-        for(BlockPos underPos : WorldHelper.scanRegion(mod, pos.down(6), pos.down())) {
+        for(BlockPos underPos : WorldHelper.scanRegion(mod, pos.below(6), pos.below())) {
             if (mod.getWorld().getBlockState(underPos).getBlock() == Blocks.CAMPFIRE)
                 return true;
         }

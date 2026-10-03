@@ -12,6 +12,7 @@ import adris.altoclef.tasks.slot.MoveInaccessibleItemToInventoryTask;
 import adris.altoclef.tasks.slot.ReceiveCraftingOutputSlotTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
+import adris.altoclef.util.CraftingRecipe;
 import adris.altoclef.util.RecipeTarget;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
@@ -19,12 +20,12 @@ import adris.altoclef.util.slots.CraftingTableSlot;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.time.TimerGame;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.screen.CraftingScreenHandler;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.inventory.CraftingMenu;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -63,6 +64,14 @@ public class CraftInTableTask extends ResourceTask {
             result.add(new ItemTarget(target.getOutputItem(), target.getTargetCount()));
         }
         return result.toArray(ItemTarget[]::new);
+    }
+
+    static List<Slot> getRecipeInputSlots(CraftingRecipe recipe) {
+        List<Slot> result = new ArrayList<>(recipe.getSlotCount());
+        for (int index = 0; index < recipe.getSlotCount(); index++) {
+            result.add(CraftingTableSlot.getInputSlot(index, recipe.isBig()));
+        }
+        return result;
     }
 
     @Override
@@ -138,12 +147,16 @@ class DoCraftInTableTask extends DoStuffInContainerTask {
         mod.getBehaviour().addProtectedItems(getMaterialsArray());
         // Our crafting slots are here for conversion
         for (RecipeTarget target : _targets) {
-            int recSlot = 0;
-            for (Slot slot : CraftingTableSlot.INPUT_SLOTS) {
-                ItemTarget valid = target.getRecipe().getSlot(recSlot++);
+            List<Slot> recipeInputSlots = CraftInTableTask.getRecipeInputSlots(target.getRecipe());
+            for (int recSlot = 0; recSlot < recipeInputSlots.size(); recSlot++) {
+                Slot slot = recipeInputSlots.get(recSlot);
+                ItemTarget valid = target.getRecipe().getSlot(recSlot);
                 mod.getBehaviour().markSlotAsConversionSlot(slot, stack -> {
-                    // We already have the item
-                    if (mod.getItemStorage().getItemCount(target.getOutputItem()) >= target.getTargetCount())
+                    // Use the concrete, non-conversion inventory count here. Calling getItemCount
+                    // evaluates this conversion predicate again and recurses indefinitely when
+                    // the output item is also one of the recipe's ingredients (template duplication).
+                    if (StorageHelper.getAccessibleInventoryItemCount(mod,
+                            new ItemTarget(target.getOutputItem())) >= target.getTargetCount())
                         return false;
                     // We don't, consider ourselves crafting!
                     return valid.matches(stack.getItem());
@@ -229,7 +242,7 @@ class DoCraftInTableTask extends DoStuffInContainerTask {
 
     @Override
     protected boolean isContainerOpen(AltoClef mod) {
-        return (mod.getPlayer().currentScreenHandler instanceof CraftingScreenHandler);
+        return (mod.getPlayer().containerMenu instanceof CraftingMenu);
     }
 
     @Override
@@ -244,7 +257,7 @@ class DoCraftInTableTask extends DoStuffInContainerTask {
         }
 
         // Reset refresh timer if we have an item in the output slot
-        boolean bigCrafting = (mod.getPlayer().currentScreenHandler instanceof CraftingScreenHandler);
+        boolean bigCrafting = (mod.getPlayer().containerMenu instanceof CraftingMenu);
         Slot outputSlot = bigCrafting ? CraftingTableSlot.OUTPUT_SLOT : PlayerSlot.CRAFT_OUTPUT_SLOT;
         if (!StorageHelper.getItemStackInSlot(outputSlot).isEmpty()) {
             _craftResetTimer.reset();

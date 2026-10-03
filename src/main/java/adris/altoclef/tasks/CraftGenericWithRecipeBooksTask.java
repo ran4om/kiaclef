@@ -12,7 +12,7 @@ import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.CraftingTableSlot;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.Arrays;
 import java.util.Optional;
@@ -20,6 +20,7 @@ import java.util.Optional;
 public class CraftGenericWithRecipeBooksTask extends Task implements ITaskUsesCraftingGrid {
 
     private final RecipeTarget _target;
+    private boolean _manualFallbackActivated;
 
     public CraftGenericWithRecipeBooksTask(RecipeTarget target) {
         _target = target;
@@ -27,11 +28,12 @@ public class CraftGenericWithRecipeBooksTask extends Task implements ITaskUsesCr
 
     @Override
     protected void onStart(AltoClef mod) {
-
+        _manualFallbackActivated = false;
     }
 
     @Override
     protected Task onTick(AltoClef mod) {
+        if (_manualFallbackActivated) return new CraftGenericManuallyTask(_target);
 
         
 
@@ -81,7 +83,11 @@ public class CraftGenericWithRecipeBooksTask extends Task implements ITaskUsesCr
         // Request to fill in a recipe. Just piggy back off of the slot delay system.
         if (mod.getSlotHandler().canDoSlotAction()) {
             mod.getSlotHandler().registerSlotAction();
-            StorageHelper.instantFillRecipeViaBook(mod, _target.getRecipe(), _target.getOutputItem(), true);
+            if (!StorageHelper.instantFillRecipeViaBook(mod, _target.getRecipe(), _target.getOutputItem(), true)) {
+                _manualFallbackActivated = true;
+                setDebugState("Recipe not unlocked; arranging ingredients manually");
+                return new CraftGenericManuallyTask(_target);
+            }
         }
 
 

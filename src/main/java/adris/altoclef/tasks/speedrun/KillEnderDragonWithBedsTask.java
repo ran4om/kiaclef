@@ -10,13 +10,13 @@ import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.LookHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import baritone.api.utils.input.Input;
-import net.minecraft.block.Blocks;
-import net.minecraft.entity.boss.dragon.EnderDragonEntity;
-import net.minecraft.entity.boss.dragon.phase.Phase;
-import net.minecraft.entity.boss.dragon.phase.PhaseType;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.entity.boss.enderdragon.phases.DragonPhaseInstance;
+import net.minecraft.world.entity.boss.enderdragon.phases.EnderDragonPhase;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 public class KillEnderDragonWithBedsTask extends Task {
 
@@ -61,14 +61,14 @@ public class KillEnderDragonWithBedsTask extends Task {
             return new GetToXZTask(0, 0);
         }
 
-        if (!mod.getEntityTracker().entityFound(EnderDragonEntity.class)) {
+        if (!mod.getEntityTracker().entityFound(EnderDragon.class)) {
             setDebugState("No dragon found.");
             return new GetToXZTask(0, 0);
         }
-        EnderDragonEntity dragon = mod.getEntityTracker().getTrackedEntities(EnderDragonEntity.class).get(0);
+        EnderDragon dragon = mod.getEntityTracker().getTrackedEntities(EnderDragon.class).get(0);
 
-        Phase dragonPhase = dragon.getPhaseManager().getCurrent();
-        boolean perching = dragonPhase.getType() == PhaseType.LANDING || dragonPhase.isSittingOrHovering();
+        DragonPhaseInstance dragonPhase = dragon.getPhaseManager().getCurrentPhase();
+        boolean perching = dragonPhase.getPhase() == EnderDragonPhase.LANDING || dragonPhase.isSitting();
 
         if (dragon.getY() < _endPortalTop.getY() + 2) {
             // Dragon is already perched.
@@ -85,15 +85,15 @@ public class KillEnderDragonWithBedsTask extends Task {
         }
 
         if (perching) {
-            BlockPos targetStandPosition = _endPortalTop.add(-1, -1, 0);
-            BlockPos playerPosition = mod.getPlayer().getBlockPos();
+            BlockPos targetStandPosition = _endPortalTop.offset(-1, -1, 0);
+            BlockPos playerPosition = mod.getPlayer().blockPosition();
 
             // If we're not positioned (above is OK), go there and make sure we're at the right height.
             if (_positionTask != null && _positionTask.isActive() && !_positionTask.isFinished(mod)) {
                 setDebugState("Going to position for bed cycle...");
                 return _positionTask;
             }
-            if (!WorldHelper.inRangeXZ(WorldHelper.toVec3d(targetStandPosition), mod.getPlayer().getPos(), 1)
+            if (!WorldHelper.inRangeXZ(WorldHelper.toVec3d(targetStandPosition), mod.getPlayer().position(), 1)
                     || playerPosition.getY() < targetStandPosition.getY()
             ) {
                 _positionTask = new GetToBlockTask(targetStandPosition);
@@ -102,7 +102,7 @@ public class KillEnderDragonWithBedsTask extends Task {
             }
 
             // We're positioned. Perform bed strats!
-            BlockPos bedTargetPosition = _endPortalTop.up();
+            BlockPos bedTargetPosition = _endPortalTop.above();
             boolean bedPlaced = mod.getBlockTracker().blockIsValid(bedTargetPosition, ItemHelper.itemsToBlocks(ItemHelper.BED));
             if (!bedPlaced) {
                 setDebugState("Placing bed");
@@ -113,7 +113,7 @@ public class KillEnderDragonWithBedsTask extends Task {
                 if (canPlace) {
                     // Look at and place!
                     if (mod.getSlotHandler().forceEquipItem(ItemHelper.BED)) {
-                        LookHelper.lookAt(mod, bedTargetPosition.down(), Direction.UP);
+                        LookHelper.lookAt(mod, bedTargetPosition.below(), Direction.UP);
                         //mod.getClientBaritone().getLookBehavior().updateTarget(placeReach.get(), true);
                         //if (mod.getClientBaritone().getPlayerContext().isLookingAt(bedTargetPosition.down())) {
                         // There could be fire so eh place right away
@@ -121,7 +121,7 @@ public class KillEnderDragonWithBedsTask extends Task {
                         //}
                     }
                 } else {
-                    if (mod.getPlayer().isOnGround()) {
+                    if (mod.getPlayer().onGround()) {
                         // Jump
                         mod.getInputControls().tryPress(Input.JUMP);
                     }
@@ -129,14 +129,14 @@ public class KillEnderDragonWithBedsTask extends Task {
             } else {
                 setDebugState("Wait for it...");
                 // Make sure we're standing on the ground so we don't blow ourselves up lmfao
-                if (!mod.getPlayer().isOnGround()) {
+                if (!mod.getPlayer().onGround()) {
                     // Wait to fall
                     return null;
                 }
                 // Wait for dragon head to be close enough to the bed's head...
                 BlockPos bedHead = WorldHelper.getBedHead(mod, bedTargetPosition);
                 assert bedHead != null;
-                Vec3d headPos = dragon.head.getBoundingBox().getCenter(); // dragon.head.getPos();
+                Vec3 headPos = dragon.head.getBoundingBox().getCenter(); // dragon.head.getPos();
                 double dist = headPos.distanceTo(WorldHelper.toVec3d(bedHead));
                 Debug.logMessage("Dist: " + dist);
                 if (dist < BeatMinecraft2Task.getConfig().dragonHeadCloseEnoughClickBedRange) {

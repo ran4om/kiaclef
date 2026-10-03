@@ -1,73 +1,61 @@
 package adris.altoclef.ui;
 
 import adris.altoclef.AltoClef;
-import adris.altoclef.Debug;
 import adris.altoclef.tasksystem.Task;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.network.chat.Component;
 
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
-import java.time.Instant;
-import java.time.format.DateTimeFormatter;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 
 public class CommandStatusOverlay {
+    private long timeRunning;
+    private long lastTime;
+    private static final DateTimeFormatter DATE_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("HH:mm:ss.SSS").withZone(ZoneOffset.UTC);
 
-    //For the ingame timer
-    private long _timeRunning;
-    private long _lastTime = 0;
+    public void render(AltoClef mod, GuiGraphicsExtractor graphics) {
+        if (!mod.getModSettings().shouldShowTaskChain()) return;
 
-    public void render(AltoClef mod, MatrixStack matrixstack) {
-        if (mod.getModSettings().shouldShowTaskChain()) {
-            List<Task> tasks = Collections.emptyList();
-            if (mod.getTaskRunner().getCurrentTaskChain() != null) {
-                tasks = mod.getTaskRunner().getCurrentTaskChain().getTasks();
-            }
-
-            int color = 0xFFFFFFFF;
-            drawTaskChain(MinecraftClient.getInstance().textRenderer, matrixstack, 0, 0, color, 10, tasks, mod);
-        }
+        List<Task> tasks = mod.getTaskRunner().getCurrentTaskChain() == null
+                ? Collections.emptyList()
+                : mod.getTaskRunner().getCurrentTaskChain().getTasks();
+        Font font = Minecraft.getInstance().font;
+        int color = 0xFFFFFFFF;
+        drawTaskChain(font, graphics, 0, 0, color, 10, tasks, mod);
     }
-    private DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSS").withZone(ZoneId.from(ZoneOffset.of("+00:00"))); // The date formatter
-    private void drawTaskChain(TextRenderer renderer, MatrixStack stack, float dx, float dy, int color, int maxLines, List<Task> tasks, AltoClef mod) {
-        if (tasks.size() == 0) {
-            renderer.draw(stack, " (no task running) ", dx, dy, color);
-            if (_lastTime+10000 < Instant.now().toEpochMilli() && mod.getModSettings().shouldShowTimer()) {//if it doesn't run any task in 10 secs
-                _timeRunning = Instant.now().toEpochMilli();//reset the timer
-            }
-        } else {
-            float fontHeight = renderer.fontHeight;
-            if (mod.getModSettings().shouldShowTimer()) { //If it's enabled
-                _lastTime = Instant.now().toEpochMilli(); //keep the last time for the timer reset
-                String _realTime = DATE_TIME_FORMATTER.format(Instant.now().minusMillis(_timeRunning)); //Format the running time to string
-                renderer.draw(stack, "<"+_realTime+">", dx, dy, color);//Draw the timer before drawing tasks list
-                dx += 8;//Do the same thing to list the tasks
-                dy += fontHeight + 2;
-            }
-            if (tasks.size() > maxLines) {
-                for (int i = 0; i < tasks.size(); ++i) {
-                    // Skip over the next tasks
-                    if (i == 0 || i > tasks.size() - maxLines) {
-                        renderer.draw(stack, tasks.get(i).toString(), dx, dy, color);
-                    } else if (i == 1) {
-                        renderer.draw(stack, " ... ", dx, dy, color);
-                    } else {
-                        continue;
-                    }
-                    dx += 8;
-                    dy += fontHeight + 2;
-                }
-            } else {
-                for (Task task : tasks) {
-                    renderer.draw(stack, task.toString(), dx, dy, color);
-                    dx += 8;
-                    dy += fontHeight + 2;
-                }
-            }
 
+    private void drawTaskChain(Font font, GuiGraphicsExtractor graphics, int x, int y, int color,
+                               int maxLines, List<Task> tasks, AltoClef mod) {
+        if (tasks.isEmpty()) {
+            graphics.text(font, Component.literal(" (no task running) "), x, y, color);
+            long now = Instant.now().toEpochMilli();
+            if (lastTime + 10_000 < now && mod.getModSettings().shouldShowTimer()) timeRunning = now;
+            return;
+        }
+
+        int fontHeight = font.lineHeight;
+        if (mod.getModSettings().shouldShowTimer()) {
+            long now = Instant.now().toEpochMilli();
+            lastTime = now;
+            String elapsed = DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(now - timeRunning));
+            graphics.text(font, Component.literal("<" + elapsed + ">"), x, y, color);
+            y += fontHeight + 2;
+        }
+
+        int start = Math.max(0, tasks.size() - maxLines);
+        if (start > 0) {
+            graphics.text(font, Component.literal(" ... "), x, y, color);
+            y += fontHeight + 2;
+        }
+        for (int i = start; i < tasks.size(); i++) {
+            graphics.text(font, Component.literal(tasks.get(i).toString()), x, y, color);
+            y += fontHeight + 2;
         }
     }
 }

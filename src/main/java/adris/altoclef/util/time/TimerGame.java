@@ -3,19 +3,19 @@ package adris.altoclef.util.time;
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
 import adris.altoclef.mixins.ClientConnectionAccessor;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.network.ClientConnection;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.Connection;
 
 // Simple timer
 public class TimerGame extends BaseTimer {
 
-    private ClientConnection _lastConnection;
+    private Connection _lastConnection;
 
     public TimerGame(double intervalSeconds) {
         super(intervalSeconds);
     }
 
-    private static double getTime(ClientConnection connection) {
+    private static double getTime(Connection connection) {
         if (connection == null) return 0;
         return (double) ((ClientConnectionAccessor) connection).getTicks() / 20.0;
     }
@@ -27,9 +27,9 @@ public class TimerGame extends BaseTimer {
             return 0;
         }
         // If we change connections, our game time will also be reset. In that case, offset our time to reflect that change.
-        ClientConnection currentConnection = null;
-        if (MinecraftClient.getInstance().getNetworkHandler() != null) {
-            currentConnection = MinecraftClient.getInstance().getNetworkHandler().getConnection();
+        Connection currentConnection = null;
+        if (Minecraft.getInstance().getConnection() != null) {
+            currentConnection = Minecraft.getInstance().getConnection().getConnection();
         }
         if (currentConnection != _lastConnection) {
             if (_lastConnection != null) {

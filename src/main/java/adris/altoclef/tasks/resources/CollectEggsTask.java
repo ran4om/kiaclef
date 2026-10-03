@@ -8,8 +8,8 @@ import adris.altoclef.tasks.movement.GetToEntityTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.Dimension;
 import adris.altoclef.util.helpers.WorldHelper;
-import net.minecraft.entity.passive.ChickenEntity;
-import net.minecraft.item.Items;
+import net.minecraft.world.entity.animal.chicken.Chicken;
+import net.minecraft.world.item.Items;
 
 public class CollectEggsTask extends ResourceTask {
 
@@ -22,7 +22,7 @@ public class CollectEggsTask extends ResourceTask {
     public CollectEggsTask(int targetCount) {
         super(Items.EGG, targetCount);
         _count = targetCount;
-        _waitNearChickens = new DoToClosestEntityTask(chicken -> new GetToEntityTask(chicken, 5), ChickenEntity.class);
+        _waitNearChickens = new DoToClosestEntityTask(chicken -> new GetToEntityTask(chicken, 5), Chicken.class);
     }
 
     @Override

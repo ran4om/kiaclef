@@ -6,17 +6,21 @@ import baritone.api.utils.IPlayerContext;
 import baritone.api.utils.RayTraceUtils;
 import baritone.api.utils.Rotation;
 import baritone.api.utils.RotationUtils;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.passive.MerchantEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.ProjectileUtil;
-import net.minecraft.screen.PlayerScreenHandler;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.*;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.npc.villager.AbstractVillager;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.ClipContext;
 
 import java.util.Optional;
 
@@ -29,13 +33,13 @@ public interface LookHelper {
         Optional<Rotation> reachable;
         IPlayerContext ctx = BaritoneAPI.getProvider().getPrimaryBaritone().getPlayerContext();
         if (side == null) {
-            assert MinecraftClient.getInstance().player != null;
+            assert Minecraft.getInstance().player != null;
             reachable = RotationUtils.reachable(ctx.player(), target, ctx.playerController().getBlockReachDistance());
         } else {
-            Vec3i sideVector = side.getVector();
-            Vec3d centerOffset = new Vec3d(0.5 + sideVector.getX() * 0.5, 0.5 + sideVector.getY() * 0.5, 0.5 + sideVector.getZ() * 0.5);
-
-            Vec3d sidePoint = centerOffset.add(target.getX(), target.getY(), target.getZ());
+            Vec3i sideVector = side.getUnitVec3i();
+            var shape = ctx.world().getBlockState(target).getShape(ctx.world(), target);
+            AABB bounds = shape.isEmpty() ? new AABB(0, 0, 0, 1, 1, 1) : shape.bounds();
+            Vec3 sidePoint = shapeFacePoint(target, bounds, side);
 
             //reachable(this.ctx.player(), _target, this.ctx.playerController().getBlockReachDistance());
             reachable = RotationUtils.reachableOffset(ctx.player(), target, sidePoint, ctx.playerController().getBlockReachDistance(), false);
@@ -43,10 +47,10 @@ public interface LookHelper {
             // Check for right angle
             if (reachable.isPresent()) {
                 // Note: If sneak, use RotationUtils.inferSneakingEyePosition
-                Vec3d camPos = ctx.player().getCameraPosVec(1.0F);
-                Vec3d vecToPlayerPos = camPos.subtract(sidePoint);
+                Vec3 camPos = ctx.player().getEyePosition(1.0F);
+                Vec3 vecToPlayerPos = camPos.subtract(sidePoint);
 
-                double dot = vecToPlayerPos.normalize().dotProduct(new Vec3d(sideVector.getX(), sideVector.getY(), sideVector.getZ()));
+                double dot = vecToPlayerPos.normalize().dot(new Vec3(sideVector.getX(), sideVector.getY(), sideVector.getZ()));
                 if (dot < 0) {
                     // We're perpendicular and cannot face.
                     return Optional.empty();
@@ -56,40 +60,57 @@ public interface LookHelper {
         return reachable;
     }
 
+    /** Aim just inside the real outline face so ray tracing hits partial blocks. */
+    static Vec3 shapeFacePoint(BlockPos target, AABB bounds, Direction side) {
+        double x = (bounds.minX + bounds.maxX) * 0.5;
+        double y = (bounds.minY + bounds.maxY) * 0.5;
+        double z = (bounds.minZ + bounds.maxZ) * 0.5;
+        double inset = 1.0e-4;
+        switch (side) {
+            case UP -> y = bounds.maxY - inset;
+            case DOWN -> y = bounds.minY + inset;
+            case EAST -> x = bounds.maxX - inset;
+            case WEST -> x = bounds.minX + inset;
+            case SOUTH -> z = bounds.maxZ - inset;
+            case NORTH -> z = bounds.minZ + inset;
+        }
+        return new Vec3(target.getX() + x, target.getY() + y, target.getZ() + z);
+    }
+
     static Optional<Rotation> getReach(BlockPos target) {
         return getReach(target, null);
     }
 
     static EntityHitResult raycast(Entity from, Entity to, double reachDistance) {
-        Vec3d fromPos = getCameraPos(from),
+        Vec3 fromPos = getCameraPos(from),
                 toPos = getCameraPos(to);
-        Vec3d direction = (toPos.subtract(fromPos).normalize().multiply(reachDistance));
-        Box box = to.getBoundingBox();
-        return ProjectileUtil.raycast(from, fromPos, fromPos.add(direction), box, entity -> entity.equals(to), 0);
+        Vec3 direction = (toPos.subtract(fromPos).normalize().scale(reachDistance));
+        AABB box = to.getBoundingBox();
+        return ProjectileUtil.getEntityHitResult(from, fromPos, fromPos.add(direction), box, entity -> entity.equals(to), 0);
     }
 
-    static boolean seesPlayer(Entity entity, Entity player, double maxRange, Vec3d entityOffs, Vec3d playerOffs) {
-        return seesPlayerOffset(entity, player, maxRange, entityOffs, playerOffs) || seesPlayerOffset(entity, player, maxRange, entityOffs, new Vec3d(0, -1, 0).add(playerOffs));
+    static boolean seesPlayer(Entity entity, Entity player, double maxRange, Vec3 entityOffs, Vec3 playerOffs) {
+        return seesPlayerOffset(entity, player, maxRange, entityOffs, playerOffs) || seesPlayerOffset(entity, player, maxRange, entityOffs, new Vec3(0, -1, 0).add(playerOffs));
     }
 
     static boolean seesPlayer(Entity entity, Entity player, double maxRange) {
-        return seesPlayer(entity, player, maxRange, Vec3d.ZERO, Vec3d.ZERO);
+        return seesPlayer(entity, player, maxRange, Vec3.ZERO, Vec3.ZERO);
     }
 
-    static boolean cleanLineOfSight(Entity entity, Vec3d start, Vec3d end, double maxRange) {
+    static boolean cleanLineOfSight(Entity entity, Vec3 start, Vec3 end, double maxRange) {
         return raycast(entity, start, end, maxRange).getType() == HitResult.Type.MISS;
     }
 
-    static boolean cleanLineOfSight(Entity entity, Vec3d end, double maxRange) {
-        Vec3d start = getCameraPos(entity);
+    static boolean cleanLineOfSight(Entity entity, Vec3 end, double maxRange) {
+        Vec3 start = getCameraPos(entity);
         return cleanLineOfSight(entity, start, end, maxRange);
     }
-    static boolean cleanLineOfSight(Vec3d end, double maxRange) {
-        return cleanLineOfSight(MinecraftClient.getInstance().player, end, maxRange);
+    static boolean cleanLineOfSight(Vec3 end, double maxRange) {
+        return cleanLineOfSight(Minecraft.getInstance().player, end, maxRange);
     }
 
     static boolean cleanLineOfSight(Entity entity, BlockPos block, double maxRange) {
-        Vec3d center = WorldHelper.toVec3d(block);
+        Vec3 center = WorldHelper.toVec3d(block);
         BlockHitResult hit = raycast(entity, getCameraPos(entity), center, maxRange);
         if (hit == null) return true;
         return switch (hit.getType()) {
@@ -99,56 +120,56 @@ public interface LookHelper {
         };
     }
 
-    static Vec3d toVec3d(Rotation rotation) {
-        return RotationUtils.calcVector3dFromRotation(rotation);
+    static Vec3 toVec3d(Rotation rotation) {
+        return RotationUtils.calcVec3dFromRotation(rotation);
     }
 
-    static BlockHitResult raycast(Entity entity, Vec3d start, Vec3d end, double maxRange) {
-        Vec3d delta = end.subtract(start);
-        if (delta.lengthSquared() > maxRange * maxRange) {
-            end = start.add(delta.normalize().multiply(maxRange));
+    static BlockHitResult raycast(Entity entity, Vec3 start, Vec3 end, double maxRange) {
+        Vec3 delta = end.subtract(start);
+        if (delta.lengthSqr() > maxRange * maxRange) {
+            end = start.add(delta.normalize().scale(maxRange));
         }
-        return entity.world.raycast(new RaycastContext(start, end, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, entity));
+        return entity.level().clip(new ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity));
     }
 
-    static BlockHitResult raycast(Entity entity, Vec3d end, double maxRange) {
-        Vec3d start = getCameraPos(entity);
+    static BlockHitResult raycast(Entity entity, Vec3 end, double maxRange) {
+        Vec3 start = getCameraPos(entity);
         return raycast(entity, start, end, maxRange);
     }
 
     static Rotation getLookRotation(Entity entity) {
-        float pitch = entity.getPitch();
-        float yaw = entity.getYaw();
+        float pitch = entity.getXRot();
+        float yaw = entity.getYRot();
         return new Rotation(yaw, pitch);
     }
     static Rotation getLookRotation() {
-        if (MinecraftClient.getInstance().player == null) {
+        if (Minecraft.getInstance().player == null) {
             return new Rotation(0,0);
         }
-        return getLookRotation(MinecraftClient.getInstance().player);
+        return getLookRotation(Minecraft.getInstance().player);
     }
 
-    static Vec3d getCameraPos(Entity entity) {
+    static Vec3 getCameraPos(Entity entity) {
         boolean isSneaking = false;
-        if (entity instanceof PlayerEntity player) {
-            isSneaking = player.isSneaking();
+        if (entity instanceof Player player) {
+            isSneaking = player.isShiftKeyDown();
         }
-        return isSneaking ? RayTraceUtils.inferSneakingEyePosition(entity) : entity.getCameraPosVec(1.0F);
+        return isSneaking ? RayTraceUtils.inferSneakingEyePosition(entity) : entity.getEyePosition(1.0F);
     }
-    static Vec3d getCameraPos(AltoClef mod) {
+    static Vec3 getCameraPos(AltoClef mod) {
         IPlayerContext ctx = BaritoneAPI.getProvider().getPrimaryBaritone().getPlayerContext();
-        return ctx.player().getCameraPosVec(1);
+        return ctx.player().getEyePosition(1);
     }
 
     //  1: Looking straight at pos
     //  0: pos is 90 degrees to the side
     // -1: pos is 180 degrees away (looking away completely)
-    static double getLookCloseness(Entity entity, Vec3d pos) {
-        Vec3d rotDirection = entity.getRotationVecClient();
-        Vec3d lookStart = getCameraPos(entity);
-        Vec3d deltaToPos = pos.subtract(lookStart);
-        Vec3d deltaDirection = deltaToPos.normalize();
-        return rotDirection.dotProduct(deltaDirection);
+    static double getLookCloseness(Entity entity, Vec3 pos) {
+        Vec3 rotDirection = entity.getForward();
+        Vec3 lookStart = getCameraPos(entity);
+        Vec3 deltaToPos = pos.subtract(lookStart);
+        Vec3 deltaDirection = deltaToPos.normalize();
+        return rotDirection.dot(deltaDirection);
     }
 
     static boolean tryAvoidingInteractable(AltoClef mod) {
@@ -159,27 +180,27 @@ public interface LookHelper {
         return true;
     }
 
-    private static boolean seesPlayerOffset(Entity entity, Entity player, double maxRange, Vec3d offsetEntity, Vec3d offsetPlayer) {
-        Vec3d start = getCameraPos(entity).add(offsetEntity);
-        Vec3d end = getCameraPos(player).add(offsetPlayer);
+    private static boolean seesPlayerOffset(Entity entity, Entity player, double maxRange, Vec3 offsetEntity, Vec3 offsetPlayer) {
+        Vec3 start = getCameraPos(entity).add(offsetEntity);
+        Vec3 end = getCameraPos(player).add(offsetPlayer);
         return cleanLineOfSight(entity, start, end, maxRange);
     }
 
     private static boolean isCollidingInteractable(AltoClef mod) {
 
-        if (!(mod.getPlayer().currentScreenHandler instanceof PlayerScreenHandler)) {
+        if (!(mod.getPlayer().containerMenu instanceof InventoryMenu)) {
             StorageHelper.closeScreen();
             return true;
         }
 
-        HitResult result = MinecraftClient.getInstance().crosshairTarget;
+        HitResult result = Minecraft.getInstance().hitResult;
         if (result == null) return false;
         if (result.getType() == HitResult.Type.BLOCK) {
-            return WorldHelper.isInteractableBlock(mod, new BlockPos(result.getPos()));
+            return WorldHelper.isInteractableBlock(mod, BlockPos.containing(result.getLocation()));
         } else if (result.getType() == HitResult.Type.ENTITY) {
             if (result instanceof EntityHitResult) {
                 Entity entity = ((EntityHitResult) result).getEntity();
-                return entity instanceof MerchantEntity;
+                return entity instanceof AbstractVillager;
             }
         }
         return false;
@@ -199,17 +220,17 @@ public interface LookHelper {
 
     static void lookAt(AltoClef mod, Rotation rotation) {
         mod.getClientBaritone().getLookBehavior().updateTarget(rotation, true);
-        mod.getPlayer().setYaw(rotation.getYaw());
-        mod.getPlayer().setPitch(rotation.getPitch());
+        mod.getPlayer().setYRot(rotation.getYaw());
+        mod.getPlayer().setXRot(rotation.getPitch());
     }
-    static void lookAt(AltoClef mod, Vec3d toLook) {
+    static void lookAt(AltoClef mod, Vec3 toLook) {
         Rotation targetRotation = getLookRotation(mod, toLook);
         lookAt(mod, targetRotation);
     }
     static void lookAt(AltoClef mod, BlockPos toLook, Direction side) {
-        Vec3d target = new Vec3d(toLook.getX() + 0.5, toLook.getY() + 0.5, toLook.getZ() + 0.5);
+        Vec3 target = new Vec3(toLook.getX() + 0.5, toLook.getY() + 0.5, toLook.getZ() + 0.5);
         if (side != null) {
-            target.add(side.getVector().getX() * 0.5, side.getVector().getY() * 0.5, side.getVector().getZ() * 0.5);
+            target.add(side.getUnitVec3i().getX() * 0.5, side.getUnitVec3i().getY() * 0.5, side.getUnitVec3i().getZ() * 0.5);
         }
         lookAt(mod, target);
     }
@@ -217,7 +238,7 @@ public interface LookHelper {
         lookAt(mod, toLook, null);
     }
 
-    static Rotation getLookRotation(AltoClef mod, Vec3d toLook) {
+    static Rotation getLookRotation(AltoClef mod, Vec3 toLook) {
         return RotationUtils.calcRotationFromVec3d(mod.getClientBaritone().getPlayerContext().playerHead(), toLook, mod.getClientBaritone().getPlayerContext().playerRotations());
     }
     static Rotation getLookRotation(AltoClef mod, BlockPos toLook) {

@@ -15,9 +15,9 @@ import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.slots.Slot;
-import net.minecraft.block.Block;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Arrays;
 import java.util.Optional;
@@ -38,6 +38,9 @@ public abstract class DoStuffInContainerTask extends Task {
     private final TimerGame _justPlacedTimer = new TimerGame(3);
     private BlockPos _cachedContainerPosition = null;
     private Task _openTableTask;
+    // True only after the cost heuristic has committed this run to making a new
+    // container. Timer age alone must not force placement on a fresh task.
+    private boolean _placeForceActive;
 
     public DoStuffInContainerTask(Block[] containerBlocks, ItemTarget containerTarget) {
         _containerBlocks = containerBlocks;
@@ -52,6 +55,8 @@ public abstract class DoStuffInContainerTask extends Task {
 
     @Override
     protected void onStart(AltoClef mod) {
+        // Deliberately preserve _placeForceActive across interruptions/resumes.
+        // A fresh task starts false; restartForNewRun clears it below.
         if (_openTableTask == null) {
             _openTableTask = new DoToClosestBlockTask(InteractWithBlockTask::new, _containerBlocks);
         }
@@ -61,6 +66,12 @@ public abstract class DoStuffInContainerTask extends Task {
         // Protect container since we might place it.
         mod.getBehaviour().push();
         mod.getBehaviour().addProtectedItems(ItemHelper.blocksToItems(_containerBlocks));
+    }
+
+    @Override
+    protected void onResetForNewRun() {
+        _placeForceActive = false;
+        _cachedContainerPosition = null;
     }
 
     @Override
@@ -81,7 +92,7 @@ public abstract class DoStuffInContainerTask extends Task {
 
         Optional<BlockPos> nearest;
 
-        Vec3d currentPos = mod.getPlayer().getPos();
+        Vec3 currentPos = mod.getPlayer().position();
         BlockPos override = overrideContainerPosition(mod);
 
         if (override != null && mod.getBlockTracker().blockIsValid(override, _containerBlocks)) {
@@ -106,8 +117,12 @@ public abstract class DoStuffInContainerTask extends Task {
         // Also keep on making the container if we're stuck in some
         if (costToWalk > getCostToMakeNew(mod)) {
             _placeForceTimer.reset();
+            _placeForceActive = true;
+        } else if (_placeForceActive && _placeForceTimer.elapsed()) {
+            _placeForceActive = false;
         }
-        if (nearest.isEmpty() || (!_placeForceTimer.elapsed() && _justPlacedTimer.elapsed())) {
+        if (shouldPlaceContainer(nearest.isEmpty(), _placeForceActive,
+                _placeForceTimer.elapsed(), _justPlacedTimer.elapsed())) {
             // It's cheaper to make a new one, or our only option.
 
             // We're no longer going to our previous container.
@@ -150,6 +165,16 @@ public abstract class DoStuffInContainerTask extends Task {
         }
         return _openTableTask;
         //return new GetToBlockTask(nearest, true);
+    }
+
+    static boolean shouldForcePlace(boolean placementIntent, boolean forceTimerElapsed,
+                                    boolean justPlacedTimerElapsed) {
+        return placementIntent && !forceTimerElapsed && justPlacedTimerElapsed;
+    }
+
+    static boolean shouldPlaceContainer(boolean nearestMissing, boolean placementIntent,
+                                        boolean forceTimerElapsed, boolean justPlacedTimerElapsed) {
+        return nearestMissing || shouldForcePlace(placementIntent, forceTimerElapsed, justPlacedTimerElapsed);
     }
 
     public ItemTarget getContainerTarget() {

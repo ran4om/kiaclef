@@ -8,13 +8,16 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ingame.SignEditScreen;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.SignEditScreen;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import org.lwjgl.glfw.GLFW;
 
 public class PlaceSignTask extends Task {
 
@@ -61,19 +64,19 @@ public class PlaceSignTask extends Task {
             return new PlaceBlockNearbyTask(ItemHelper.WOOD_SIGNS_ALL);
         } else {
 
-            assert MinecraftClient.getInstance().world != null;
-            BlockState b = MinecraftClient.getInstance().world.getBlockState(_target);
+            assert Minecraft.getInstance().level != null;
+            BlockState b = Minecraft.getInstance().level.getBlockState(_target);
 
             if (!isSign(b.getBlock()) && !b.isAir() && b.getBlock() != Blocks.WATER && b.getBlock() != Blocks.LAVA) {
                 return new DestroyBlockTask(_target);
             }
 
-            return new InteractWithBlockTask(new ItemTarget("sign", 1), Direction.UP, _target.down(), true);
+            return new InteractWithBlockTask(new ItemTarget("sign", 1), Direction.UP, _target.below(), true);
         }
     }
 
     private Task editSign(AltoClef mod) {
-        SignEditScreen screen = (SignEditScreen) MinecraftClient.getInstance().currentScreen;
+        SignEditScreen screen = (SignEditScreen) Minecraft.getInstance().gui.screen();
         assert screen != null;
 
         StringBuilder currentLine = new StringBuilder();
@@ -82,13 +85,13 @@ public class PlaceSignTask extends Task {
 
         final int SIGN_TEXT_MAX_WIDTH = 90;
 
-        for (char c : _message.toCharArray()) {
-            currentLine.append(c);
+        for (int codePoint : _message.codePoints().toArray()) {
+            currentLine.appendCodePoint(codePoint);
 
-            if (c == '\n' || MinecraftClient.getInstance().textRenderer.getWidth(currentLine.toString()) > SIGN_TEXT_MAX_WIDTH) {
+            if (codePoint == '\n' || Minecraft.getInstance().font.width(currentLine.toString()) > SIGN_TEXT_MAX_WIDTH) {
                 currentLine.delete(0, currentLine.length());
-                if (c != '\n') {
-                    currentLine.append(c);
+                if (codePoint != '\n') {
+                    currentLine.appendCodePoint(codePoint);
                 }
                 lines++;
                 if (lines >= 4) {
@@ -97,15 +100,17 @@ public class PlaceSignTask extends Task {
                 }
 
                 // Add newline
-                screen.keyPressed(257, 36, 0);
+                screen.keyPressed(new KeyEvent(GLFW.GLFW_KEY_ENTER, 0, 0));
                 //Debug.logMessage("NEW LINE ADDED BEFORE: " + c);
             }
             // keycode don't matter
             //int keyCode = java.awt.event.KeyEvent.getExtendedKeyCodeForChar(c);
-            screen.charTyped(c, -1);
+            if (codePoint != '\n') {
+                screen.charTyped(new CharacterEvent(codePoint));
+            }
             //screen.keyPressed(keyCode, -1, )
         }
-        screen.close();
+        screen.onClose();
         _finished = true;
 
         return null;
@@ -147,6 +152,6 @@ public class PlaceSignTask extends Task {
     }
 
     private boolean editingSign() {
-        return MinecraftClient.getInstance().currentScreen instanceof SignEditScreen;
+        return Minecraft.getInstance().gui.screen() instanceof SignEditScreen;
     }
 }

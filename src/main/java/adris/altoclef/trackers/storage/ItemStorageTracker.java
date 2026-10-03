@@ -6,10 +6,11 @@ import adris.altoclef.trackers.TrackerManager;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.Slot;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.Arrays;
@@ -59,14 +60,16 @@ public class ItemStorageTracker extends Tracker {
                 ItemStack stack = StorageHelper.getItemStackInSlot(slot);
                 if (ArrayUtils.contains(items, stack.getItem())) {
                     boolean satisfiesConversion = pair.getRight().test(stack);
-                    if (satisfiesConversion) {
-                        return stack.getCount();
-                    }
+                    return countConversionStack(slot.isSlotInPlayerInventory(), satisfiesConversion, stack.getCount());
                 }
             }
             return 0;
         }).reduce(0, Integer::sum);
         return _inventory.getItemCount(true, false, items) + inConversionSlots;
+    }
+
+    static int countConversionStack(boolean alreadyCountedInPlayerInventory, boolean satisfiesConversion, int count) {
+        return !alreadyCountedInPlayerInventory && satisfiesConversion ? count : 0;
     }
     public int getItemCount(ItemTarget ...targets) {
         return Arrays.stream(targets).mapToInt(target -> getItemCount(target.getMatches())).reduce(0, Integer::sum);
@@ -246,24 +249,29 @@ public class ItemStorageTracker extends Tracker {
     public List<ContainerCache> getCachedContainers() {
         return getCachedContainers(cache -> true);
     }
-    public Optional<ContainerCache> getContainerClosestTo(Vec3d pos, Predicate<ContainerCache> accept) {
+    public Optional<ContainerCache> getContainerClosestTo(Vec3 pos, Predicate<ContainerCache> accept) {
         return _containers.getClosestTo(pos, accept);
     }
-    public Optional<ContainerCache> getContainerClosestTo(Vec3d pos, ContainerType ...types) {
+    public Optional<ContainerCache> getContainerClosestTo(Vec3 pos, ContainerType ...types) {
         return _containers.getClosestTo(pos, types);
     }
-    public Optional<ContainerCache> getContainerClosestTo(Vec3d pos) {
+    public Optional<ContainerCache> getContainerClosestTo(Vec3 pos) {
         return getContainerClosestTo(pos, cache -> true);
     }
     public List<ContainerCache> getContainersWithItem(Item ...items) {
         return _containers.getContainersWithItem(items);
     }
-    public Optional<ContainerCache> getClosestContainerWithItem(Vec3d pos, Item ...items) {
+    public Optional<ContainerCache> getClosestContainerWithItem(Vec3 pos, Item ...items) {
         return _containers.getClosestWithItem(pos, items);
     }
 
     public Optional<BlockPos> getLastBlockPosInteraction() {
         return Optional.ofNullable(_containers.getLastBlockPosInteraction());
+    }
+
+    /** Returns a block position only while this exact menu belongs to a tracked open container session. */
+    public Optional<BlockPos> getContainerPositionForMenu(AbstractContainerMenu menu) {
+        return _containers.getContainerPositionForMenu(menu);
     }
 
     @Override
@@ -278,4 +286,3 @@ public class ItemStorageTracker extends Tracker {
         _containers.reset();
     }
 }
-

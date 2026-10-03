@@ -14,27 +14,37 @@ import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.slots.SmithingTableSlot;
-import net.minecraft.block.Blocks;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.screen.PlayerScreenHandler;
-import net.minecraft.screen.SmithingScreenHandler;
-import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.inventory.SmithingMenu;
+import net.minecraft.world.inventory.ContainerInput;
 
 public class UpgradeInSmithingTableTask extends ResourceTask {
 
+    private final ItemTarget _template;
     private final ItemTarget _tool;
     private final ItemTarget _material;
     private final ItemTarget _output;
 
     private final Task _innerTask;
 
-    public UpgradeInSmithingTableTask(ItemTarget tool, ItemTarget material, ItemTarget output) {
+    public UpgradeInSmithingTableTask(ItemTarget template, ItemTarget tool, ItemTarget material, ItemTarget output) {
         super(output);
+        // Netherite upgrade templates are consumed. Keep one seed after this upgrade
+        // so later smithing tasks can reuse it without looting another Bastion.
+        _template = new ItemTarget(template, output.getTargetCount() + 1);
         _tool = new ItemTarget(tool, output.getTargetCount());
         _material = new ItemTarget(material, output.getTargetCount());
         _output = output;
         _innerTask = new UpgradeInSmithingTableInternalTask();
+    }
+
+    /** Compatibility constructor for callers that upgrade using the current vanilla netherite template. */
+    public UpgradeInSmithingTableTask(ItemTarget tool, ItemTarget material, ItemTarget output) {
+        this(new ItemTarget(Items.NETHERITE_UPGRADE_SMITHING_TEMPLATE, output.getTargetCount()),
+                tool, material, output);
     }
 
     @Override
@@ -45,6 +55,7 @@ public class UpgradeInSmithingTableTask extends ResourceTask {
     @Override
     protected void onResourceStart(AltoClef mod) {
         mod.getBehaviour().push();
+        mod.getBehaviour().markSlotAsConversionSlot(SmithingTableSlot.INPUT_SLOT_TEMPLATE, stack -> _template.matches(stack.getItem()));
         mod.getBehaviour().markSlotAsConversionSlot(SmithingTableSlot.INPUT_SLOT_TOOL, stack -> _tool.matches(stack.getItem()));
         mod.getBehaviour().markSlotAsConversionSlot(SmithingTableSlot.INPUT_SLOT_MATERIALS, stack -> _material.matches(stack.getItem()));
     }
@@ -61,24 +72,28 @@ public class UpgradeInSmithingTableTask extends ResourceTask {
     protected Task onResourceTick(AltoClef mod) {
         // if we don't have tools + materials, get them.
 
-        boolean inSmithingTable = (mod.getPlayer().currentScreenHandler instanceof SmithingScreenHandler);
+        boolean inSmithingTable = (mod.getPlayer().containerMenu instanceof SmithingMenu);
 
+        int templatesInSlot = inSmithingTable ? getItemsInSlot(mod, SmithingTableSlot.INPUT_SLOT_TEMPLATE, _template) : 0;
         int materialsInSlot = inSmithingTable ? getItemsInSlot(mod, SmithingTableSlot.INPUT_SLOT_MATERIALS, _material) : 0;
         int toolsInSlot = inSmithingTable ? getItemsInSlot(mod, SmithingTableSlot.INPUT_SLOT_TOOL, _tool) : 0;
         int ouputInSlot = inSmithingTable ? getItemsInSlot(mod, SmithingTableSlot.OUTPUT_SLOT, _output) : 0;
 
-        int desiredOutput = _output.getTargetCount() - ouputInSlot;
+        int desiredOutput = getRemainingUpgradeCount(_output.getTargetCount(),
+                StorageHelper.getAccessibleInventoryItemCount(mod, _output), ouputInSlot);
 
-        if (mod.getItemStorage().getItemCount(_tool) + toolsInSlot < desiredOutput ||
-                mod.getItemStorage().getItemCount(_material) + materialsInSlot < desiredOutput) {
-            setDebugState("Getting materials + tools");
-            return TaskCatalogue.getSquashedItemTask(_tool, _material);
+        if (mod.getItemStorage().getItemCountInventoryOnly(_template.getMatches()) + templatesInSlot < desiredOutput + 1 ||
+                mod.getItemStorage().getItemCountInventoryOnly(_tool.getMatches()) + toolsInSlot < desiredOutput ||
+                mod.getItemStorage().getItemCountInventoryOnly(_material.getMatches()) + materialsInSlot < desiredOutput) {
+            setDebugState("Getting smithing templates, base items, and materials");
+            return TaskCatalogue.getSquashedItemTask(new ItemTarget(_template, desiredOutput + 1),
+                    new ItemTarget(_tool, desiredOutput), new ItemTarget(_material, desiredOutput));
         }
 
         // Edge case: We are wearing the armor we want to upgrade. If so, remove it.
         if (StorageHelper.isArmorEquipped(mod, _tool.getMatches())) {
             // Exit out of any screen so we can move our armor
-            if (!(mod.getPlayer().currentScreenHandler instanceof PlayerScreenHandler)) {
+            if (!(mod.getPlayer().containerMenu instanceof InventoryMenu)) {
                 StorageHelper.closeScreen();
                 setDebugState("Quickly removing equipped armor");
                 return null;
@@ -90,7 +105,7 @@ public class UpgradeInSmithingTableTask extends ResourceTask {
             for (Slot armorSlot : PlayerSlot.ARMOR_SLOTS) {
                 if (_tool.matches(StorageHelper.getItemStackInSlot(armorSlot).getItem())) {
                     setDebugState("Quickly removing equipped armor");
-                    return new ClickSlotTask(armorSlot, 0, SlotActionType.QUICK_MOVE);
+                    return new ClickSlotTask(armorSlot, 0, ContainerInput.QUICK_MOVE);
                 }
             }
         }
@@ -101,20 +116,24 @@ public class UpgradeInSmithingTableTask extends ResourceTask {
 
     @Override
     protected void onResourceStop(AltoClef mod, Task interruptTask) {
-        mod.getBehaviour().push();
+        if (mod.getPlayer() != null && mod.getPlayer().containerMenu instanceof SmithingMenu) {
+            StorageHelper.closeScreen();
+        }
+        mod.getBehaviour().pop();
     }
 
     @Override
     protected boolean isEqualResource(ResourceTask other) {
         if (other instanceof UpgradeInSmithingTableTask task) {
-            return task._tool.equals(_tool) && task._output.equals(_output) && task._material.equals(_material);
+            return task._template.equals(_template) && task._tool.equals(_tool)
+                    && task._output.equals(_output) && task._material.equals(_material);
         }
         return false;
     }
 
     @Override
     protected String toDebugStringName() {
-        return "Upgrading " + _tool.toString() + " + " + _material.toString() + " -> " + _output.toString();
+        return "Upgrading " + _template + " + " + _tool + " + " + _material + " -> " + _output;
     }
 
     private class UpgradeInSmithingTableInternalTask extends DoStuffInContainerTask {
@@ -134,7 +153,7 @@ public class UpgradeInSmithingTableTask extends ResourceTask {
 
         @Override
         protected boolean isContainerOpen(AltoClef mod) {
-            return (mod.getPlayer().currentScreenHandler instanceof SmithingScreenHandler);
+            return (mod.getPlayer().containerMenu instanceof SmithingMenu);
         }
 
         @Override
@@ -150,15 +169,21 @@ public class UpgradeInSmithingTableTask extends ResourceTask {
             _invTimer.reset();
 
             Slot materialSlot = SmithingTableSlot.INPUT_SLOT_MATERIALS;
+            Slot templateSlot = SmithingTableSlot.INPUT_SLOT_TEMPLATE;
             Slot toolSlot = SmithingTableSlot.INPUT_SLOT_TOOL;
             Slot outputSlot = SmithingTableSlot.OUTPUT_SLOT;
 
             ItemStack currentMaterials = StorageHelper.getItemStackInSlot(materialSlot);
+            ItemStack currentTemplate = StorageHelper.getItemStackInSlot(templateSlot);
             ItemStack currentTools = StorageHelper.getItemStackInSlot(toolSlot);
             ItemStack currentOutput = StorageHelper.getItemStackInSlot(outputSlot);
             // Grab from output
             if (!currentOutput.isEmpty()) {
-                return new ClickSlotTask(outputSlot, SlotActionType.QUICK_MOVE);
+                return new ClickSlotTask(outputSlot, ContainerInput.QUICK_MOVE);
+            }
+            // Put template in slot
+            if (currentTemplate.isEmpty() || !_template.matches(currentTemplate.getItem())) {
+                return new MoveItemToSlotFromInventoryTask(new ItemTarget(_template, 1), templateSlot);
             }
             // Put materials in slot
             if (currentMaterials.isEmpty() || !_material.matches(currentMaterials.getItem())) {
@@ -190,8 +215,16 @@ public class UpgradeInSmithingTableTask extends ResourceTask {
         return _tool;
     }
 
+    public ItemTarget getTemplate() {
+        return _template;
+    }
+
     public ItemTarget getMaterials() {
         return _material;
+    }
+
+    static int getRemainingUpgradeCount(int target, int storedOutput, int readyOutput) {
+        return Math.max(0, target - storedOutput - readyOutput);
     }
 
 }

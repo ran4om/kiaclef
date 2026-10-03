@@ -2,31 +2,40 @@ package adris.altoclef.mixins;
 
 import adris.altoclef.eventbus.EventBus;
 import adris.altoclef.eventbus.events.BlockPlaceEvent;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(World.class)
-public class WorldBlockModifiedMixin {
+import java.util.ArrayDeque;
+import java.util.Deque;
 
-    private static boolean hasBlock(BlockState state, BlockPos pos) {
-        return !state.isAir() && state.isSolidBlock(MinecraftClient.getInstance().world, pos);
+@Mixin(LevelChunk.class)
+public abstract class WorldBlockModifiedMixin {
+    @Unique private static final ThreadLocal<Deque<BlockState>> altoclef$previousStates =
+            ThreadLocal.withInitial(ArrayDeque::new);
+
+    @Inject(method = "setBlockState", at = @At("HEAD"))
+    private void altoclef$capturePreviousState(BlockPos pos, BlockState state, int flags,
+                                               CallbackInfoReturnable<BlockState> cir) {
+        altoclef$previousStates.get().push(((LevelChunk) (Object) this).getBlockState(pos));
     }
 
-    @Inject(
-            method = "onBlockChanged",
-            at = @At("HEAD")
-    )
-    public void onBlockWasChanged(BlockPos pos, BlockState oldBlock, BlockState newBlock, CallbackInfo ci) {
-        if (!hasBlock(oldBlock, pos) && hasBlock(newBlock, pos)) {
-            BlockPlaceEvent evt = new BlockPlaceEvent(pos, newBlock);
-            EventBus.publish(evt);
+    @Inject(method = "setBlockState", at = @At("RETURN"))
+    private void altoclef$publishPlacement(BlockPos pos, BlockState state, int flags,
+                                           CallbackInfoReturnable<BlockState> cir) {
+        LevelChunk chunk = (LevelChunk) (Object) this;
+        Deque<BlockState> states = altoclef$previousStates.get();
+        BlockState before = states.isEmpty() ? null : states.pop();
+        if (states.isEmpty()) altoclef$previousStates.remove();
+        if (chunk.getLevel() instanceof ClientLevel && before != null
+                && !before.isSolid() && state.isSolid() && cir.getReturnValue() != null) {
+            EventBus.publish(new BlockPlaceEvent(pos, state));
         }
     }
-    //onBlockChanged
 }

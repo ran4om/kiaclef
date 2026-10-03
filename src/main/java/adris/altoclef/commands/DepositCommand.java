@@ -1,14 +1,14 @@
 package adris.altoclef.commands;
 
+import adris.altoclef.util.helpers.ItemCapabilities;
 import adris.altoclef.AltoClef;
 import adris.altoclef.commandsystem.*;
 import adris.altoclef.tasks.container.StoreInAnyContainerTask;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.PlayerSlot;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.ToolItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import org.apache.commons.lang3.ArrayUtils;
 
 public class DepositCommand extends Command {
@@ -25,7 +25,7 @@ public class DepositCommand extends Command {
             // Ignore tools
             if (!stack.isEmpty()) {
                 Item item = stack.getItem();
-                return !(item instanceof ToolItem);
+                return !(ItemCapabilities.isTool(item));
             }
             return false;
         });

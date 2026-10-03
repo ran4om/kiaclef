@@ -8,9 +8,9 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.phys.Vec3;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -52,7 +52,7 @@ public class ConfigHelper {
 
         ObjectMapper mapper = new ObjectMapper();
         SimpleModule module = new SimpleModule();
-        module.addDeserializer(Vec3d.class, new Vec3dDeserializer());
+        module.addDeserializer(Vec3.class, new Vec3dDeserializer());
         module.addDeserializer(ChunkPos.class, new ChunkPosDeserializer());
         module.addDeserializer(BlockPos.class, new BlockPosDeserializer());
         mapper.registerModule(module);
@@ -92,7 +92,7 @@ public class ConfigHelper {
     public static <T> void saveConfig(String path, T config) {
         ObjectMapper mapper = new ObjectMapper();
         SimpleModule module = new SimpleModule();
-        module.addSerializer(Vec3d.class, new Vec3dSerializer());
+        module.addSerializer(Vec3.class, new Vec3dSerializer());
         module.addSerializer(BlockPos.class, new BlockPosSerializer());
         module.addSerializer(ChunkPos.class, new ChunkPosSerializer());
         mapper.registerModule(module);

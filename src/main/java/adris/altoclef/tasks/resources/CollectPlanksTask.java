@@ -7,7 +7,8 @@ import adris.altoclef.tasks.ResourceTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.*;
 import adris.altoclef.util.helpers.ItemHelper;
-import net.minecraft.item.Item;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -54,7 +55,12 @@ public class CollectPlanksTask extends ResourceTask {
 
         // Craft when we can
         int totalInventoryPlankCount = mod.getItemStorage().getItemCount(_planks);
-        int potentialPlanks = totalInventoryPlankCount + mod.getItemStorage().getItemCount(_logs) * 4;
+        int bambooBlocks = Arrays.asList(_planks).contains(Items.BAMBOO_PLANKS)
+                ? mod.getItemStorage().getItemCount(Items.BAMBOO_BLOCK, Items.STRIPPED_BAMBOO_BLOCK)
+                : 0;
+        int potentialPlanks = totalInventoryPlankCount
+                + mod.getItemStorage().getItemCount(_logs) * 4
+                + bambooBlocks * 2;
         if (potentialPlanks >= _targetCount) {
             for (Item logCheck : _logs) {
                 int count = mod.getItemStorage().getItemCount(logCheck);
@@ -67,8 +73,21 @@ public class CollectPlanksTask extends ResourceTask {
                     int otherPlankCount = totalInventoryPlankCount - plankCount;
                     int targetTotalPlanks = Math.min(count*4 + plankCount, _targetCount - otherPlankCount);
                     setDebugState("We have " + logCheck + ", crafting " + targetTotalPlanks + " planks.");
-                    return new CraftInInventoryTask(new RecipeTarget(plankCheck, targetTotalPlanks, generatePlankRecipe(_logs)));
+                    // Once a concrete plank output is selected, only accept its matching log in the recipe.
+                    // A broad family target here can place another wood's log in the grid and craft the wrong planks.
+                    return new CraftInInventoryTask(new RecipeTarget(plankCheck, targetTotalPlanks, generatePlankRecipe(logCheck)));
                 }
+            }
+            if (bambooBlocks > 0) {
+                int plankCount = mod.getItemStorage().getItemCount(Items.BAMBOO_PLANKS);
+                int otherPlankCount = totalInventoryPlankCount - plankCount;
+                int targetTotalPlanks = Math.min(bambooBlocks * 2 + plankCount, _targetCount - otherPlankCount);
+                setDebugState("We have bamboo blocks, crafting " + targetTotalPlanks + " bamboo planks.");
+                CraftingRecipe recipe = CraftingRecipe.newShapedRecipe(
+                        "bamboo_planks",
+                        new ItemTarget[]{new ItemTarget(new Item[]{Items.BAMBOO_BLOCK, Items.STRIPPED_BAMBOO_BLOCK}, 1), null, null, null},
+                        2);
+                return new CraftInInventoryTask(new RecipeTarget(Items.BAMBOO_PLANKS, targetTotalPlanks, recipe));
             }
         }
 
@@ -96,7 +115,10 @@ public class CollectPlanksTask extends ResourceTask {
 
     @Override
     protected boolean isEqualResource(ResourceTask other) {
-        return other instanceof CollectPlanksTask;
+        return other instanceof CollectPlanksTask task
+                && Arrays.equals(task._planks, _planks)
+                && Arrays.equals(task._logs, _logs)
+                && task._logsInNether == _logsInNether;
     }
 
     @Override
@@ -109,11 +131,11 @@ public class CollectPlanksTask extends ResourceTask {
         return this;
     }
 
-    private static CraftingRecipe generatePlankRecipe(Item[] logs) {
+    static CraftingRecipe generatePlankRecipe(Item log) {
         return CraftingRecipe.newShapedRecipe(
                 "planks",
                 new Item[][]{
-                        logs, null,
+                        new Item[]{log}, null,
                         null, null
                 },
                 4

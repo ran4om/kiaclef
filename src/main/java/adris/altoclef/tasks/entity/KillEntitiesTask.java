@@ -1,6 +1,6 @@
 package adris.altoclef.tasks.entity;
 
-import net.minecraft.entity.Entity;
+import net.minecraft.world.entity.Entity;
 
 import java.util.function.Predicate;
 

@@ -3,11 +3,11 @@ package adris.altoclef.control;
 import adris.altoclef.AltoClef;
 import adris.altoclef.util.time.TimerGame;
 import adris.altoclef.util.helpers.StlHelper;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.mob.SkeletonEntity;
-import net.minecraft.entity.projectile.FireballEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.monster.skeleton.Skeleton;
+import net.minecraft.world.entity.projectile.hurtingprojectile.LargeFireball;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +32,7 @@ public class KillAura {
     public void applyAura(AltoClef mod, Entity entity) {
         _targets.add(entity);
         // Always hit ghast balls.
-        if (entity instanceof FireballEntity) _forceHit = entity;
+        if (entity instanceof LargeFireball) _forceHit = entity;
     }
 
     public void tickEnd(AltoClef mod) {
@@ -43,7 +43,7 @@ public class KillAura {
                 break;
             case SMART:
 
-                if (_targets.size() <= 2 || _targets.stream().allMatch(entity -> entity instanceof SkeletonEntity) ) {
+                if (_targets.size() <= 2 || _targets.stream().allMatch(entity -> entity instanceof Skeleton) ) {
                     performDelayedAttack(mod);
                 } else {
                     // Attack force mobs ALWAYS.
@@ -54,7 +54,7 @@ public class KillAura {
                     if (_hitDelay.elapsed()) {
                         _hitDelay.reset();
 
-                        Optional<Entity> toHit = _targets.stream().min(StlHelper.compareValues(entity -> entity.squaredDistanceTo(mod.getPlayer())));
+                        Optional<Entity> toHit = _targets.stream().min(StlHelper.compareValues(entity -> entity.distanceToSqr(mod.getPlayer())));
 
                         toHit.ifPresent(entity -> attack(mod, entity));
                     }
@@ -78,9 +78,9 @@ public class KillAura {
             return;
         }
 
-        Optional<Entity> toHit = _targets.stream().min(StlHelper.compareValues(entity -> entity.squaredDistanceTo(mod.getPlayer())));
+        Optional<Entity> toHit = _targets.stream().min(StlHelper.compareValues(entity -> entity.distanceToSqr(mod.getPlayer())));
 
-        if (mod.getPlayer() == null || mod.getPlayer().getAttackCooldownProgress(0) < 1) {
+        if (mod.getPlayer() == null || mod.getPlayer().getAttackStrengthScale(0) < 1) {
             return;
         }
 
@@ -99,7 +99,7 @@ public class KillAura {
     }
     private void attack(AltoClef mod, Entity entity, boolean equipSword) {
         if (entity == null) return;
-        if (Double.isInfinite(_forceFieldRange) || entity.squaredDistanceTo(mod.getPlayer()) < _forceFieldRange * _forceFieldRange) {
+        if (Double.isInfinite(_forceFieldRange) || entity.distanceToSqr(mod.getPlayer()) < _forceFieldRange * _forceFieldRange) {
             boolean canAttack;
             if (equipSword) {
                 // Equip sword, or if we don't have one just use our fists.

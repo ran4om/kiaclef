@@ -7,10 +7,10 @@ import adris.altoclef.tasks.ResourceTask;
 import adris.altoclef.tasks.entity.AbstractDoToEntityTask;
 import adris.altoclef.tasks.resources.CollectMilkTask.MilkCowTask;
 import adris.altoclef.tasksystem.Task;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.passive.CowEntity;
-import net.minecraft.item.Items;
-import net.minecraft.util.Hand;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.animal.cow.Cow;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.InteractionHand;
 
 import java.util.Optional;
 
@@ -39,7 +39,7 @@ public class CollectMilkTask extends ResourceTask {
             return TaskCatalogue.getItemTask(Items.BUCKET, 1);
         }
         // Dimension
-        if (!mod.getEntityTracker().entityFound(CowEntity.class) && isInWrongDimension(mod)) {
+        if (!mod.getEntityTracker().entityFound(Cow.class) && isInWrongDimension(mod)) {
             return getToCorrectDimensionTask(mod);
         }
         return new MilkCowTask();
@@ -78,7 +78,7 @@ public class CollectMilkTask extends ResourceTask {
                 return null;
             }
             if (mod.getSlotHandler().forceEquipItem(Items.BUCKET)) {
-                mod.getController().interactEntity(mod.getPlayer(), entity, Hand.MAIN_HAND);
+                mod.getController().interact(mod.getPlayer(), entity, new net.minecraft.world.phys.EntityHitResult(entity), InteractionHand.MAIN_HAND);
             }
 
 
@@ -87,7 +87,7 @@ public class CollectMilkTask extends ResourceTask {
 
         @Override
         protected Optional<Entity> getEntityTarget(AltoClef mod) {
-            return mod.getEntityTracker().getClosestEntity(mod.getPlayer().getPos(), CowEntity.class);
+            return mod.getEntityTracker().getClosestEntity(mod.getPlayer().position(), Cow.class);
         }
 
         @Override

@@ -1,5 +1,6 @@
 package adris.altoclef.tasks.misc;
 
+import adris.altoclef.util.helpers.ItemCapabilities;
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
 import adris.altoclef.tasks.slot.MoveItemToSlotFromInventoryTask;
@@ -9,9 +10,8 @@ import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
-import net.minecraft.item.ArmorItem;
-import net.minecraft.item.Item;
-import net.minecraft.screen.PlayerScreenHandler;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.inventory.InventoryMenu;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.Arrays;
@@ -47,17 +47,17 @@ public class EquipArmorTask extends Task {
 
         // Now equip
         for (ItemTarget targetArmor : _toEquip) {
-            ArmorItem item = (ArmorItem) Objects.requireNonNull(targetArmor.getMatches())[0];
+            Item item =  Objects.requireNonNull(targetArmor.getMatches())[0];
             if (item == null) {
                 Debug.logWarning("Item " + targetArmor + " is not armor! Will not equip.");
             } else {
                 if (!StorageHelper.isArmorEquipped(mod, item)) {
-                    if (!(mod.getPlayer().currentScreenHandler instanceof PlayerScreenHandler)) {
+                    if (!(mod.getPlayer().containerMenu instanceof InventoryMenu)) {
                         StorageHelper.closeScreen();
                     }
-                    Slot toMove = PlayerSlot.getEquipSlot(item.getSlotType());
+                    Slot toMove = PlayerSlot.getEquipSlot(ItemCapabilities.equipmentSlot(item));
                     if (toMove == null) {
-                        Debug.logWarning("Invalid armor equip slot for item " + item.getTranslationKey() + ": " + item.getSlotType());
+                        Debug.logWarning("Invalid armor equip slot for item " + item.getDescriptionId() + ": " + ItemCapabilities.equipmentSlot(item));
                     }
                     return new MoveItemToSlotFromInventoryTask(targetArmor, toMove);
                 }

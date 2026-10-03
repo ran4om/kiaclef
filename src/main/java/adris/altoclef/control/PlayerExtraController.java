@@ -4,9 +4,9 @@ import adris.altoclef.AltoClef;
 import adris.altoclef.eventbus.EventBus;
 import adris.altoclef.eventbus.events.BlockBreakingCancelEvent;
 import adris.altoclef.eventbus.events.BlockBreakingEvent;
-import net.minecraft.entity.Entity;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.core.BlockPos;
 
 public class PlayerExtraController {
 
@@ -44,13 +44,13 @@ public class PlayerExtraController {
     }
 
     public boolean inRange(Entity entity) {
-        return _mod.getPlayer().isInRange(entity, _mod.getModSettings().getEntityReachRange());
+        return _mod.getPlayer().closerThan(entity, _mod.getModSettings().getEntityReachRange());
     }
 
     public void attack(Entity entity) {
         if (inRange(entity)) {
-            _mod.getController().attackEntity(_mod.getPlayer(), entity);
-            _mod.getPlayer().swingHand(Hand.MAIN_HAND);
+            _mod.getController().attack(_mod.getPlayer(), entity);
+            _mod.getPlayer().swing(InteractionHand.MAIN_HAND);
         }
     }
 }

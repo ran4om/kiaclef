@@ -10,7 +10,7 @@ import adris.altoclef.commandsystem.CommandException;
 import adris.altoclef.tasks.entity.GiveItemToPlayerTask;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.ItemHelper;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.ItemStack;
 
 public class GiveCommand extends Command {
     public GiveCommand() throws CommandException {
@@ -37,8 +37,8 @@ public class GiveCommand extends Command {
             target = TaskCatalogue.getItemTarget(item, count);
         } else {
             // Unregistered item, might still be in inventory though.
-            for (int i = 0; i < mod.getPlayer().getInventory().size(); ++i) {
-                ItemStack stack = mod.getPlayer().getInventory().getStack(i);
+            for (int i = 0; i < mod.getPlayer().getInventory().getContainerSize(); ++i) {
+                ItemStack stack = mod.getPlayer().getInventory().getItem(i);
                 if (!stack.isEmpty()) {
                     String name = ItemHelper.stripItemName(stack.getItem());
                     if (name.equals(item)) {

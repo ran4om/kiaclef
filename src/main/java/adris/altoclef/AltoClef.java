@@ -21,17 +21,17 @@ import adris.altoclef.ui.MessagePriority;
 import adris.altoclef.ui.MessageSender;
 import adris.altoclef.util.helpers.InputHelper;
 import baritone.Baritone;
-import baritone.altoclef.AltoClefSettings;
+import adris.altoclef.baritone.AltoClefSettings;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import baritone.api.BaritoneAPI;
 import baritone.api.Settings;
 import net.fabricmc.api.ModInitializer;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.network.ClientPlayerInteractionManager;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.multiplayer.MultiPlayerGameMode;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayDeque;
@@ -44,7 +44,7 @@ import java.util.stream.Collectors;
 /**
  * Central access point for AltoClef
  */
-public class AltoClef implements ModInitializer {
+public class AltoClef implements net.fabricmc.api.ClientModInitializer {
 
     // Static access to altoclef
     private static final Queue<Consumer<AltoClef>> _postInitQueue = new ArrayDeque<>();
@@ -77,23 +77,33 @@ public class AltoClef implements ModInitializer {
     private SlotHandler _slotHandler;
     // Butler
     private Butler _butler;
+    private boolean _loadInitializationStarted;
+    private boolean _loadInitializationClientThread;
+    private boolean _loadInitializationCompleted;
 
     // Are we in game (playing in a server/world)
     public static boolean inGame() {
-        return MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().getNetworkHandler() != null;
+        Minecraft minecraft = Minecraft.getInstance();
+        return minecraft != null && minecraft.player != null && minecraft.getConnection() != null;
     }
 
     @Override
-    public void onInitialize() {
+    public void onInitializeClient() {
         // This code runs as soon as Minecraft is in a mod-load-ready state.
         // However, some things (like resources) may still be uninitialized.
         // As such, nothing will be loaded here but basic initialization.
         EventBus.subscribe(TitleScreenEntryEvent.class, evt -> onInitializeLoad());
+        // Quick Play can enter a world without constructing the title screen.
+        // Its JOIN callback runs after the player and world are installed.
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> onInitializeLoad());
     }
 
     public void onInitializeLoad() {
         // This code should be run after Minecraft loads everything else in.
-        // This is the actual start point, controlled by a mixin.
+        // The title-screen event handles ordinary startup; JOIN covers Quick Play.
+        if (_loadInitializationStarted) return;
+        _loadInitializationStarted = true;
+        _loadInitializationClientThread = Minecraft.getInstance().isSameThread();
 
         initializeBaritoneSettings();
 
@@ -165,13 +175,16 @@ public class AltoClef implements ModInitializer {
         // Tick with the client
         EventBus.subscribe(ClientTickEvent.class, evt -> onClientTick());
         // Render
-        EventBus.subscribe(ClientRenderEvent.class, evt -> onClientRenderOverlay(evt.stack));
+        EventBus.subscribe(ClientRenderEvent.class, evt -> onClientRenderOverlay(evt.graphics));
 
         // Playground
         Playground.IDLE_TEST_INIT_FUNCTION(this);
 
         // External mod initialization
         runEnqueuedPostInits();
+
+        _loadInitializationCompleted = true;
+        Debug.logInternal("Global Init\tclientThread=" + _loadInitializationClientThread);
     }
 
     // Client tick
@@ -204,8 +217,8 @@ public class AltoClef implements ModInitializer {
         _inputControls.onTickPost();
     }
 
-    private void onClientRenderOverlay(MatrixStack matrixStack) {
-        _commandStatusOverlay.render(this, matrixStack);
+    private void onClientRenderOverlay(net.minecraft.client.gui.GuiGraphicsExtractor graphics) {
+        _commandStatusOverlay.render(this, graphics);
     }
 
     /// GETTERS AND SETTERS
@@ -347,6 +360,14 @@ public class AltoClef implements ModInitializer {
         return _settings;
     }
 
+    public boolean isLoadInitializationComplete() {
+        return _loadInitializationCompleted;
+    }
+
+    public boolean wasLoadInitializationOnClientThread() {
+        return _loadInitializationClientThread;
+    }
+
     /**
      * Butler controller. Keeps track of users and lets you receive user messages
      */
@@ -371,26 +392,26 @@ public class AltoClef implements ModInitializer {
     /**
      * Minecraft player client access (could just be static honestly)
      */
-    public ClientPlayerEntity getPlayer() {
-        return MinecraftClient.getInstance().player;
+    public LocalPlayer getPlayer() {
+        return Minecraft.getInstance().player;
     }
 
     /**
      * Minecraft world access (could just be static honestly)
      */
-    public ClientWorld getWorld() {
-        return MinecraftClient.getInstance().world;
+    public ClientLevel getWorld() {
+        return Minecraft.getInstance().level;
     }
 
     /**
      * Minecraft client interaction controller access (could just be static honestly)
      */
-    public ClientPlayerInteractionManager getController() {
-        return MinecraftClient.getInstance().interactionManager;
+    public MultiPlayerGameMode getController() {
+        return Minecraft.getInstance().gameMode;
     }
 
     /**
-     * Extra controls not present in ClientPlayerInteractionManager. This REALLY should be made static or combined with something else.
+     * Extra controls not present in MultiPlayerGameMode. This REALLY should be made static or combined with something else.
      */
     public PlayerExtraController getControllerExtras() {
         return _extraController;

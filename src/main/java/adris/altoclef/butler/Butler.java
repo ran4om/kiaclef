@@ -6,8 +6,8 @@ import adris.altoclef.eventbus.EventBus;
 import adris.altoclef.eventbus.events.ChatMessageEvent;
 import adris.altoclef.eventbus.events.TaskFinishedEvent;
 import adris.altoclef.ui.MessagePriority;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.network.MessageType;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.ChatType;
 
 /**
  * The butler system lets authorized players send commands to the bot to execute.
@@ -58,7 +58,7 @@ public class Butler {
     private void receiveMessage(String msg) {
         // Format: <USER> whispers to you: <MESSAGE>
         // Format: <USER> whispers: <MESSAGE>
-        String ourName = MinecraftClient.getInstance().getName();
+        String ourName = Minecraft.getInstance().getUser().getName();
         WhisperChecker.MessageResult result = this._whisperChecker.receiveMessage(_mod, ourName, msg);
         if (result != null) {
             this.receiveWhisper(result.from, result.message);

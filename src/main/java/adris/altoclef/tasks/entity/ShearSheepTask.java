@@ -3,10 +3,10 @@ package adris.altoclef.tasks.entity;
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
 import adris.altoclef.tasksystem.Task;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.passive.SheepEntity;
-import net.minecraft.item.Items;
-import net.minecraft.util.Hand;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.animal.sheep.Sheep;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.InteractionHand;
 
 import java.util.Optional;
 
@@ -28,7 +28,7 @@ public class ShearSheepTask extends AbstractDoToEntityTask {
             return null;
         }
         if (mod.getSlotHandler().forceEquipItem(Items.SHEARS)) {
-            mod.getController().interactEntity(mod.getPlayer(), entity, Hand.MAIN_HAND);
+            mod.getController().interact(mod.getPlayer(), entity, new net.minecraft.world.phys.EntityHitResult(entity), InteractionHand.MAIN_HAND);
         }
 
 
@@ -37,13 +37,13 @@ public class ShearSheepTask extends AbstractDoToEntityTask {
 
     @Override
     protected Optional<Entity> getEntityTarget(AltoClef mod) {
-        return mod.getEntityTracker().getClosestEntity(mod.getPlayer().getPos(),
+        return mod.getEntityTracker().getClosestEntity(mod.getPlayer().position(),
                 entity -> {
-                    if (entity instanceof SheepEntity sheep) {
-                        return sheep.isShearable() && !sheep.isSheared();
+                    if (entity instanceof Sheep sheep) {
+                        return sheep.readyForShearing() && !sheep.isSheared();
                     }
                     return false;
-                }, SheepEntity.class
+                }, Sheep.class
         );
     }
 

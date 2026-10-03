@@ -2,7 +2,7 @@ package adris.altoclef.util;
 
 import adris.altoclef.util.helpers.WorldHelper;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 
 import java.util.Objects;
 
@@ -33,7 +33,7 @@ public class BlockRange {
 
     @JsonIgnore
     public BlockPos getCenter() {
-        BlockPos sum = start.add(end);
+        BlockPos sum = start.offset(end);
         return new BlockPos(sum.getX() / 2, sum.getY() / 2, sum.getZ() / 2);
     }
 

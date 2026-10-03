@@ -1,13 +1,13 @@
 package adris.altoclef.eventbus.events;
 
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.world.phys.BlockHitResult;
 
 public class BlockInteractEvent {
     public BlockHitResult hitResult;
-    public ClientWorld world;
+    public ClientLevel world;
 
-    public BlockInteractEvent(BlockHitResult hitResult, ClientWorld world) {
+    public BlockInteractEvent(BlockHitResult hitResult, ClientLevel world) {
         this.hitResult = hitResult;
         this.world = world;
     }

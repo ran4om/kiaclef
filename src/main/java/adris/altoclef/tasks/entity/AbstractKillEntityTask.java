@@ -2,9 +2,9 @@ package adris.altoclef.tasks.entity;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
-import net.minecraft.entity.Entity;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 
 /**
  * Attacks an entity, but the target entity must be specified.
@@ -52,7 +52,7 @@ public abstract class AbstractKillEntityTask extends AbstractDoToEntityTask {
 
     @Override
     protected Task onEntityInteract(AltoClef mod, Entity entity) {
-        float hitProg = mod.getPlayer().getAttackCooldownProgress(0);
+        float hitProg = mod.getPlayer().getAttackStrengthScale(0);
 
         // Equip weapon
         equipWeapon(mod);

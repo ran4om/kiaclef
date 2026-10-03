@@ -1,6 +1,6 @@
 package adris.altoclef.eventbus.events;
 
-import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.level.ChunkPos;
 
 public class ChunkUnloadEvent {
     public ChunkPos chunkPos;

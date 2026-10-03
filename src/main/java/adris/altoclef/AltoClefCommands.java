@@ -17,6 +17,7 @@ public class AltoClefCommands {
                 new GiveCommand(),
                 new EquipCommand(),
                 new DepositCommand(),
+                new StoreGearInEnderChestCommand(),
                 new StashCommand(),
                 new GotoCommand(),
                 new IdleCommand(),
@@ -30,8 +31,11 @@ public class AltoClefCommands {
                 new ReloadSettingsCommand(),
                 new GamerCommand(),
                 new PunkCommand(),
+                new KillingSpreeCommand(),
+                new BodyguardCommand(),
                 new SetGammaCommand(),
                 new ListCommand(),
+                new BuildCommand(),
                 new CustomCommand()
                 //new TestMoveInventoryCommand(),
                 //    new TestSwapInventoryCommand()

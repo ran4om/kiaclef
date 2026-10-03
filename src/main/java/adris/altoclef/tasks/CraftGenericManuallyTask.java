@@ -2,7 +2,7 @@ package adris.altoclef.tasks;
 
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasks.slot.ClickSlotTask;
-import adris.altoclef.tasks.slot.MoveItemToSlotFromInventoryTask;
+import adris.altoclef.tasks.slot.MoveItemToSlotTask;
 import adris.altoclef.tasks.slot.ReceiveCraftingOutputSlotTask;
 import adris.altoclef.tasks.slot.ThrowCursorTask;
 import adris.altoclef.tasksystem.ITaskUsesCraftingGrid;
@@ -14,10 +14,12 @@ import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.CraftingTableSlot;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 import java.util.Optional;
+import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Assuming a crafting screen is open, crafts a recipe.
@@ -51,11 +53,27 @@ public class CraftGenericManuallyTask extends Task implements ITaskUsesCraftingG
 
         Slot outputSlot = bigCrafting ? CraftingTableSlot.OUTPUT_SLOT : PlayerSlot.CRAFT_OUTPUT_SLOT;
 
-        // Example:
-        // We need 9 sticks
-        // plank recipe results in 4 sticks
-        // this means 3 planks per slot
-        int requiredPerSlot = (int)Math.ceil((double) _target.getTargetCount() / _target.getRecipe().outputCount());
+        ItemStack output = StorageHelper.getItemStackInSlot(outputSlot);
+        ItemStack cursor = StorageHelper.getItemStackInCursorSlot();
+        int matchingOutputInputsInGrid = countMatchingInputsInGrid(bigCrafting, _target.getOutputItem());
+        int outputCursorCount = cursor.getItem() == _target.getOutputItem() ? cursor.getCount() : 0;
+        int inventoryOutputCount = mod.getItemStorage().getItemCountInventoryOnly(_target.getOutputItem())
+                - outputCursorCount
+                // The player crafting grid is included by InventorySubTracker while the inventory screen is open.
+                - (!bigCrafting ? matchingOutputInputsInGrid : 0);
+        int requiredCraftCount = getRequiredCraftCount(_target,
+                inventoryOutputCount,
+                outputCursorCount,
+                output.getItem() == _target.getOutputItem() ? output.getCount() : 0,
+                matchingOutputInputsInGrid);
+        int requiredPerSlot = requiredCraftCount;
+
+        if (requiredCraftCount == 0) {
+            if (!output.isEmpty() && output.getItem() == _target.getOutputItem()) {
+                return new ReceiveCraftingOutputSlotTask(outputSlot, _target.getTargetCount());
+            }
+            return null;
+        }
 
         // For each slot in table
         for (int craftSlot = 0; craftSlot < _target.getRecipe().getSlotCount(); ++craftSlot) {
@@ -77,12 +95,18 @@ public class CraftGenericManuallyTask extends Task implements ITaskUsesCraftingG
                 }
             } else {
                 boolean correctItem = toFill.matches(present.getItem());
+                if (!present.isEmpty() && !correctItem) {
+                    setDebugState("Clearing an incorrect crafting ingredient");
+                    return new ClickSlotTask(currentCraftSlot);
+                }
                 boolean isSatisfied = correctItem && present.getCount() >= requiredPerSlot;
                 if (!isSatisfied) {
-                    // We have items that satisfy, but we CAN NOT fill in the current slot!
-                    // In that case, just grab from the output.
-                    if (!mod.getItemStorage().hasItemInventoryOnly(present.getItem())) {
-                        if (!StorageHelper.getItemStackInSlot(outputSlot).isEmpty()) {
+                    int alreadyInSlot = correctItem ? present.getCount() : 0;
+                    int missingForSlot = Math.max(0, requiredPerSlot - alreadyInSlot);
+                    List<Slot> ingredientInventorySlots = getIngredientInventorySlots(mod, toFill, bigCrafting);
+                    boolean matchingItemInInventory = !ingredientInventorySlots.isEmpty();
+                    if (missingForSlot > 0 && !hasMatchingIngredientAvailable(toFill, matchingItemInInventory, cursor)) {
+                        if (!output.isEmpty()) {
                             setDebugState("NO MORE to fit: grabbing from output.");
                             return new ReceiveCraftingOutputSlotTask(outputSlot, _target.getTargetCount());
                         } else {
@@ -92,7 +116,8 @@ public class CraftGenericManuallyTask extends Task implements ITaskUsesCraftingG
                     }
 
                     setDebugState("Moving item to slot...");
-                    return new MoveItemToSlotFromInventoryTask(new ItemTarget(toFill, requiredPerSlot), currentCraftSlot);
+                    ItemTarget ingredientTarget = new ItemTarget(toFill, requiredPerSlot);
+                    return new MoveItemToSlotTask(ingredientTarget, currentCraftSlot, ignored -> ingredientInventorySlots);
                 }
                 // We could be OVER satisfied
                 boolean oversatisfies = present.getCount() > requiredPerSlot;
@@ -104,7 +129,6 @@ public class CraftGenericManuallyTask extends Task implements ITaskUsesCraftingG
         }
 
         // Ensure our cursor is empty/can receive our item
-        ItemStack cursor = StorageHelper.getItemStackInCursorSlot();
         if (!ItemHelper.canStackTogether(StorageHelper.getItemStackInSlot(outputSlot), cursor)) {
             Optional<Slot> toFit = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursor, false).or(() -> StorageHelper.getGarbageSlot(mod));
             if (toFit.isPresent()) {
@@ -139,5 +163,74 @@ public class CraftGenericManuallyTask extends Task implements ITaskUsesCraftingG
     @Override
     protected String toDebugString() {
         return "Crafting: " + _target;
+    }
+
+    static int getRequiredCraftCount(RecipeTarget target, int outputInventoryCount,
+                                     int outputCursorCount, int outputSlotCount,
+                                     int matchingOutputInputsInGrid) {
+        int availableOutput = outputInventoryCount + outputCursorCount + outputSlotCount
+                + matchingOutputInputsInGrid;
+        int missingOutput = Math.max(0, target.getTargetCount() - availableOutput);
+        if (missingOutput == 0) return 0;
+
+        int outputItemsConsumedPerCraft = 0;
+        for (ItemTarget slot : target.getRecipe().getSlots()) {
+            if (slot != null && slot.matches(target.getOutputItem())) {
+                outputItemsConsumedPerCraft++;
+            }
+        }
+        int netOutputPerCraft = target.getRecipe().outputCount() - outputItemsConsumedPerCraft;
+        if (netOutputPerCraft <= 0) {
+            throw new IllegalArgumentException("Recipe cannot increase its requested output: " + target);
+        }
+        int requiredCrafts = 1 + (missingOutput - 1) / netOutputPerCraft;
+
+        // Every populated recipe slot needs one ingredient per batch. Keep the requested
+        // batch count within the smallest stack that could satisfy each slot, including
+        // non-stackable recipe inputs such as bows.
+        int maxCraftsPerSlot = Integer.MAX_VALUE;
+        for (ItemTarget slot : target.getRecipe().getSlots()) {
+            if (slot == null || slot.isEmpty()) continue;
+            int slotMaxStackSize = Integer.MAX_VALUE;
+            for (var item : slot.getMatches()) {
+                if (item != null) {
+                    slotMaxStackSize = Math.min(slotMaxStackSize, new ItemStack(item, 1).getMaxStackSize());
+                }
+            }
+            if (slotMaxStackSize != Integer.MAX_VALUE) {
+                maxCraftsPerSlot = Math.min(maxCraftsPerSlot, slotMaxStackSize);
+            }
+        }
+        return Math.min(requiredCrafts, maxCraftsPerSlot);
+    }
+
+    static boolean hasMatchingIngredientAvailable(ItemTarget ingredient, boolean inventoryHasMatch, ItemStack cursor) {
+        return inventoryHasMatch || (!cursor.isEmpty() && ingredient.matches(cursor.getItem()));
+    }
+
+    private int countMatchingInputsInGrid(boolean bigCrafting, net.minecraft.world.item.Item outputItem) {
+        int count = 0;
+        for (int craftSlot = 0; craftSlot < _target.getRecipe().getSlotCount(); craftSlot++) {
+            ItemTarget expected = _target.getRecipe().getSlot(craftSlot);
+            if (expected == null || !expected.matches(outputItem)) continue;
+            Slot slot = bigCrafting
+                    ? CraftingTableSlot.getInputSlot(craftSlot, _target.getRecipe().isBig())
+                    : PlayerSlot.getCraftInputSlot(craftSlot);
+            ItemStack present = StorageHelper.getItemStackInSlot(slot);
+            if (expected.matches(present.getItem())) count += present.getCount();
+        }
+        return count;
+    }
+
+    private List<Slot> getIngredientInventorySlots(AltoClef mod, ItemTarget ingredient, boolean bigCrafting) {
+        List<Slot> craftingInputs = new ArrayList<>();
+        for (int i = 0; i < _target.getRecipe().getSlotCount(); i++) {
+            craftingInputs.add(bigCrafting
+                    ? CraftingTableSlot.getInputSlot(i, _target.getRecipe().isBig())
+                    : PlayerSlot.getCraftInputSlot(i));
+        }
+        return mod.getItemStorage().getSlotsWithItemPlayerInventory(false, ingredient.getMatches()).stream()
+                .filter(slot -> !Slot.isCursor(slot) && !craftingInputs.contains(slot))
+                .toList();
     }
 }

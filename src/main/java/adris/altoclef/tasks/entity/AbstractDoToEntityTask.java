@@ -10,9 +10,9 @@ import adris.altoclef.util.helpers.LookHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import baritone.api.pathing.goals.GoalRunAway;
-import net.minecraft.entity.Entity;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.hit.HitResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
 
 import java.util.Optional;
 
@@ -79,7 +79,7 @@ public abstract class AbstractDoToEntityTask extends Task implements ITaskRequir
         // TODO: This is basically useless.
         EntityHitResult result = LookHelper.raycast(mod.getPlayer(), entity, playerReach);
 
-        double sqDist = entity.squaredDistanceTo(mod.getPlayer());
+        double sqDist = entity.distanceToSqr(mod.getPlayer());
 
         if (sqDist < _combatGuardLowerRange * _combatGuardLowerRange) {
             mod.getMobDefenseChain().setForceFieldRange(_combatGuardLowerFieldRadius);
@@ -96,11 +96,11 @@ public abstract class AbstractDoToEntityTask extends Task implements ITaskRequir
         if (tooClose) {
             //setDebugState("Maintaining distance");
             if (!mod.getClientBaritone().getCustomGoalProcess().isActive()) {
-                mod.getClientBaritone().getCustomGoalProcess().setGoalAndPath(new GoalRunAway(maintainDistance, entity.getBlockPos()));
+                mod.getClientBaritone().getCustomGoalProcess().setGoalAndPath(new GoalRunAway(maintainDistance, entity.blockPosition()));
             }
         }
 
-        if (entity.squaredDistanceTo(mod.getPlayer()) < playerReach * playerReach && result != null && result.getType() == HitResult.Type.ENTITY) {
+        if (entity.distanceToSqr(mod.getPlayer()) < playerReach * playerReach && result != null && result.getType() == HitResult.Type.ENTITY) {
             _progress.reset();
             return onEntityInteract(mod, entity);
         } else if (!tooClose) {

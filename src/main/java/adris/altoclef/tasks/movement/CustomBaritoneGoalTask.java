@@ -68,7 +68,7 @@ public abstract class CustomBaritoneGoalTask extends Task implements ITaskRequir
         if (_cachedGoal == null) {
             _cachedGoal = newGoal(mod);
         }
-        return _cachedGoal != null && _cachedGoal.isInGoal(mod.getPlayer().getBlockPos());
+        return _cachedGoal != null && _cachedGoal.isInGoal(mod.getPlayer().blockPosition());
     }
 
     @Override

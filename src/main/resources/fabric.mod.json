@@ -1,26 +1,29 @@
 {
   "schemaVersion": 1,
   "id": "altoclef",
-  "version": "0.4.1a",
+  "version": "${version}",
   "name": "Alto Clef",
-  "description": "Plays Block Game",
-  "authors": [
-    "TacoTechnica",
-    "James Green"
-  ],
+  "description": "Autonomous resource gathering, crafting, and schematic building for Minecraft 26.2",
+  "authors": ["TacoTechnica", "James Green"],
   "contact": {
-    "homepage": "https://fabricc.net/",
-    "sources": "https://github.com/FabricMC/fabric-example-mod"
+    "homepage": "https://github.com/gaucho-matrero/altoclef",
+    "sources": "https://github.com/gaucho-matrero/altoclef"
   },
-  "license": "CC0-1.0",
+  "license": "MIT",
   "icon": "assets/altoclef/icon.png",
-  "environment": "*",
+  "environment": "client",
   "entrypoints": {
-    "main": [
-      "adris.altoclef.AltoClef"
-    ]
+    "client": ["adris.altoclef.AltoClef"]
   },
-  "mixins": [
-    "altoclef.mixins.json"
+  "mixins": ["altoclef.mixins.json"],
+  "depends": {
+    "java": ">=25",
+    "fabricloader": ">=0.19.3",
+    "minecraft": "${minecraft_version}",
+    "fabric-api": ">=0.154.2+26.2",
+    "baritone": "1.19.0"
+  },
+  "jars": [
+    {"file": "META-INF/jars/baritone-unoptimized-fabric-1.19.0.jar"}
   ]
 }

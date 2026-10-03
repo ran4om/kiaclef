@@ -18,10 +18,10 @@ import baritone.api.pathing.goals.GoalTwoBlocks;
 import baritone.api.process.ICustomGoalProcess;
 import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
-import net.minecraft.item.Item;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3i;
+import net.minecraft.world.item.Item;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Vec3i;
 
 import java.util.Optional;
 
@@ -103,12 +103,12 @@ public class InteractWithBlockTask extends Task {
 
         boolean sideMatters = interactSide != null;
         if (sideMatters) {
-            Vec3i offs = interactSide.getVector();
+            Vec3i offs = interactSide.getUnitVec3i();
             if (offs.getY() == -1) {
                 // If we're below, place ourselves two blocks below.
-                offs = offs.down();
+                offs = offs.below();
             }
-            target = target.add(offs);
+            target = target.offset(offs);
         }
 
         if (walkInto) {
@@ -117,10 +117,10 @@ public class InteractWithBlockTask extends Task {
             if (sideMatters) {
                 // Make sure we're on the right side of the block.
                 Goal sideGoal = new GoalBlockSide(target, interactSide, 1);
-                return new GoalAnd(sideGoal, new GoalNear(target.add(interactOffset), reachDistance));
+                return new GoalAnd(sideGoal, new GoalNear(target.offset(interactOffset), reachDistance));
             } else {
                 // TODO: Cleaner method of picking which side to approach from. This is only here for the lava stuff.
-                return new GoalTwoBlocks(target.up());
+                return new GoalTwoBlocks(target.above());
                 //return new GoalNear(target.add(interactOffset), reachDistance);
             }
         }

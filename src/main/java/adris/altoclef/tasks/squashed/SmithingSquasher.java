@@ -9,23 +9,34 @@ import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.Slot;
 import adris.altoclef.util.slots.SmithingTableSlot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.SmithingScreenHandler;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.inventory.SmithingMenu;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class SmithingSquasher extends TypeSquasher<UpgradeInSmithingTableTask> {
 
     @Override
     protected List<ResourceTask> getSquashed(List<UpgradeInSmithingTableTask> tasks) {
-        // Group materials + tools together, then return a list of the same UpgradeInSmithing tasks
+        // Gather every consumed template plus one reusable seed for the whole batch,
+        // along with all bases and additions, then perform each upgrade.
         List<ResourceTask> result = new ArrayList<>();
         List<ItemTarget> units = new ArrayList<>();
+        Map<Item, Integer> templateCounts = new HashMap<>();
         for (UpgradeInSmithingTableTask task : tasks) {
+            Item template = task.getTemplate().getMatches()[0];
+            int upgrades = task.getItemTargets()[0].getTargetCount();
+            templateCounts.merge(template, upgrades, Integer::sum);
             units.add(task.getMaterials());
             units.add(task.getTools());
+        }
+        for (Map.Entry<Item, Integer> entry : templateCounts.entrySet()) {
+            units.add(new ItemTarget(entry.getKey(), entry.getValue() + 1));
         }
         result.add(new GetMaterialsTask(units.toArray(ItemTarget[]::new)));
         // Afterwards, perform the smithing.
@@ -62,12 +73,13 @@ public class SmithingSquasher extends TypeSquasher<UpgradeInSmithingTableTask> {
             List<ItemTarget> resultingTargets = Arrays.asList(_itemTargets);
 
             // Subtract required counts if we're in a smithing table, so putting items in the table doesn't remove them.
-            boolean inSmithingTable = (mod.getPlayer().currentScreenHandler instanceof SmithingScreenHandler);
+            boolean inSmithingTable = (mod.getPlayer().containerMenu instanceof SmithingMenu);
             if (inSmithingTable) {
                 for (int i = 0; i < resultingTargets.size(); ++i) {
                     ItemTarget target = resultingTargets.get(i);
                     int smithingTableCount = getItemsInSlot(mod, SmithingTableSlot.INPUT_SLOT_MATERIALS, target)
                             + getItemsInSlot(mod, SmithingTableSlot.INPUT_SLOT_TOOL, target)
+                            + getItemsInSlot(mod, SmithingTableSlot.INPUT_SLOT_TEMPLATE, target)
                             + getItemsInSlot(mod, SmithingTableSlot.OUTPUT_SLOT, target);
                     resultingTargets.set(i, new ItemTarget(target, target.getTargetCount() - smithingTableCount));
                 }

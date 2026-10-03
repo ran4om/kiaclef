@@ -1,0 +1,20 @@
+gradle.projectsEvaluated {
+  def rootProject = gradle.rootProject
+  rootProject.tasks.register("materializePackagedRuntimeArgs") {
+    group = "verification"
+    description = "Writes Loom's runClient classpath argfile without starting the development client."
+
+    doLast {
+      // Loom's lazy jvmArguments provider writes the runClient argfile as a
+      // side effect. Resolving it does not execute the JavaExec task.
+      rootProject.tasks.named("runClient").get().jvmArguments.get()
+
+      def argFile = rootProject.layout.buildDirectory
+          .file("loom-cache/argFiles/runClient").get().asFile
+      if (!argFile.isFile() || argFile.length() == 0) {
+        throw new GradleException("Loom did not materialize ${argFile}.")
+      }
+      println("LOOM_RUNCLIENT_ARGFILE\t${argFile}\tbytes=${argFile.length()}")
+    }
+  }
+}

@@ -16,11 +16,11 @@ import adris.altoclef.util.helpers.WorldHelper;
 import baritone.api.pathing.goals.GoalComposite;
 import baritone.api.pathing.goals.GoalGetToBlock;
 import baritone.api.pathing.goals.GoalYLevel;
-import net.minecraft.block.Blocks;
-import net.minecraft.item.Items;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.Vec3i;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.core.Vec3i;
 
 public class GetToOuterEndIslandsTask extends Task {
     private Task _beatTheGame;
@@ -62,8 +62,8 @@ public class GetToOuterEndIslandsTask extends Task {
                 return new GetBuildingMaterialsTask(blocksNeeded);
             }
             GoalAnd goal = makeGoal(gateway);
-            Debug.logMessage(mod.getPlayer().getBlockPos().toString());
-            if (!goal.isInGoal(mod.getPlayer().getBlockPos()) || !mod.getPlayer().isOnGround()) {
+            Debug.logMessage(mod.getPlayer().blockPosition().toString());
+            if (!goal.isInGoal(mod.getPlayer().blockPosition()) || !mod.getPlayer().onGround()) {
                 mod.getClientBaritone().getCustomGoalProcess().setGoal(goal);
                 if (!mod.getClientBaritone().getPathingBehavior().isPathing()) {
                     mod.getClientBaritone().getCustomGoalProcess().path();
@@ -92,7 +92,7 @@ public class GetToOuterEndIslandsTask extends Task {
     @Override
     public boolean isFinished(AltoClef mod) {
         return WorldHelper.getCurrentDimension() == Dimension.END &&
-                !WorldHelper.inRangeXZ(new Vec3d(0, 64, 0), mod.getPlayer().getPos(), END_ISLAND_START_RADIUS);
+                !WorldHelper.inRangeXZ(new Vec3(0, 64, 0), mod.getPlayer().position(), END_ISLAND_START_RADIUS);
     }
 
     @Override
@@ -102,14 +102,14 @@ public class GetToOuterEndIslandsTask extends Task {
 
     private GoalAnd makeGoal(BlockPos gateway) {
         return new GoalAnd(new GoalComposite(
-                new GoalGetToBlock(gateway.add(OFFSETS[0])),
-                new GoalGetToBlock(gateway.add(OFFSETS[1])),
-                new GoalGetToBlock(gateway.add(OFFSETS[2])),
-                new GoalGetToBlock(gateway.add(OFFSETS[3])),
-                new GoalGetToBlock(gateway.add(OFFSETS[4])),
-                new GoalGetToBlock(gateway.add(OFFSETS[5])),
-                new GoalGetToBlock(gateway.add(OFFSETS[6])),
-                new GoalGetToBlock(gateway.add(OFFSETS[7]))
+                new GoalGetToBlock(gateway.offset(OFFSETS[0])),
+                new GoalGetToBlock(gateway.offset(OFFSETS[1])),
+                new GoalGetToBlock(gateway.offset(OFFSETS[2])),
+                new GoalGetToBlock(gateway.offset(OFFSETS[3])),
+                new GoalGetToBlock(gateway.offset(OFFSETS[4])),
+                new GoalGetToBlock(gateway.offset(OFFSETS[5])),
+                new GoalGetToBlock(gateway.offset(OFFSETS[6])),
+                new GoalGetToBlock(gateway.offset(OFFSETS[7]))
         ), new GoalYLevel(74));
     }
 }

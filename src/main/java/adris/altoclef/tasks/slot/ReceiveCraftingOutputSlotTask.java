@@ -8,8 +8,8 @@ import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.CraftingTableSlot;
 import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.slots.Slot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.inventory.ContainerInput;
 
 public class ReceiveCraftingOutputSlotTask extends Task implements ITaskUsesCraftingGrid {
 
@@ -42,7 +42,7 @@ public class ReceiveCraftingOutputSlotTask extends Task implements ITaskUsesCraf
         boolean takeAll = weWantToAddToInventory >= craftCount;
         if (takeAll && mod.getItemStorage().getSlotThatCanFitInPlayerInventory(inOutput, true).isPresent()) {
             setDebugState("Quick moving output");
-            return new ClickSlotTask(_slot, SlotActionType.QUICK_MOVE);
+            return new ClickSlotTask(_slot, ContainerInput.QUICK_MOVE);
         }
         setDebugState("Picking up output");
         return new ClickSlotTask(_slot);

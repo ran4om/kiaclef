@@ -12,17 +12,17 @@ import adris.altoclef.util.helpers.WorldHelper;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import baritone.api.schematic.AbstractSchematic;
 import baritone.api.schematic.ISchematic;
-import baritone.api.utils.BlockOptionalMeta;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.item.Items;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.BlockPos;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * Place a block type at a position
@@ -111,7 +111,7 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
         // Place block
         if (tryingAlternativeWay()) {
             setDebugState("Alternative way: Trying to go above block to place block.");
-            return new GetToBlockTask(_target.up(), false);
+            return new GetToBlockTask(_target.above(), false);
         } else {
             setDebugState("Letting baritone place a block.");
 
@@ -143,7 +143,7 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
 
     @Override
     public boolean isFinished(AltoClef mod) {
-        assert MinecraftClient.getInstance().world != null;
+        assert Minecraft.getInstance().level != null;
         if (_useThrowaways) {
             return WorldHelper.isSolid(mod, _target);
         }
@@ -160,6 +160,34 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
         return _failCount % 4 == 3;
     }
 
+    static BlockState selectDesiredPlacementState(Block[] requestedBlocks, boolean useThrowaways,
+                                                  Predicate<BlockState> isThrowaway,
+                                                  List<BlockState> available) {
+        if (available != null) {
+            for (BlockState possible : available) {
+                if (possible == null) continue;
+                if (requestedBlocks != null && Arrays.asList(requestedBlocks).contains(possible.getBlock())) {
+                    return possible;
+                }
+            }
+            if (useThrowaways) {
+                for (BlockState possible : available) {
+                    if (possible != null && isThrowaway.test(possible)) return possible;
+                }
+            }
+        }
+
+        // Baritone's candidates may omit the requested material. Keep the
+        // explicit target so the builder can collect it instead of silently
+        // substituting an unrelated available block or cobblestone.
+        if (requestedBlocks != null) {
+            for (Block requested : requestedBlocks) {
+                if (requested != null) return requested.defaultBlockState();
+            }
+        }
+        return Blocks.COBBLESTONE.defaultBlockState();
+    }
+
     private class PlaceStructureSchematic extends AbstractSchematic {
 
         private final AltoClef _mod;
@@ -172,19 +200,9 @@ public class PlaceBlockTask extends Task implements ITaskRequiresGrounded {
         @Override
         public BlockState desiredState(int x, int y, int z, BlockState blockState, List<BlockState> available) {
             if (x == 0 && y == 0 && z == 0) {
-                // Place!!
-                for (BlockState possible : available) {
-                    if (possible == null) continue;
-                    if (_useThrowaways && _mod.getClientBaritoneSettings().acceptableThrowawayItems.value.contains(possible.getBlock().asItem())) {
-                        return possible;
-                    }
-                    if (Arrays.asList(_toPlace).contains(possible.getBlock())) {
-                        return possible;
-                    }
-                }
-                Debug.logInternal("Failed to find throwaway block");
-                // No throwaways available!!
-                return new BlockOptionalMeta(Blocks.COBBLESTONE).getAnyBlockState();
+                return selectDesiredPlacementState(_toPlace, _useThrowaways,
+                        state -> _mod.getClientBaritoneSettings().acceptableThrowawayItems.value
+                                .contains(state.getBlock().asItem()), available);
             }
             // Don't care.
             return blockState;

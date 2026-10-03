@@ -1,6 +1,6 @@
 package adris.altoclef.eventbus;
 
-import net.minecraft.util.Pair;
+import adris.altoclef.util.Pair;
 
 import java.util.ArrayList;
 import java.util.HashMap;

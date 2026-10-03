@@ -3,9 +3,9 @@ package adris.altoclef.tasks;
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.helpers.WorldHelper;
-import net.minecraft.block.Block;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Arrays;
 import java.util.Optional;
@@ -20,14 +20,14 @@ public class DoToClosestBlockTask extends AbstractDoToClosestObjectTask<BlockPos
 
     private final Block[] _targetBlocks;
 
-    private final Supplier<Vec3d> _getOriginPos;
-    private final Function<Vec3d, Optional<BlockPos>> _getClosest;
+    private final Supplier<Vec3> _getOriginPos;
+    private final Function<Vec3, Optional<BlockPos>> _getClosest;
 
     private final Function<BlockPos, Task> _getTargetTask;
 
     private final Predicate<BlockPos> _isValid;
 
-    public DoToClosestBlockTask(Supplier<Vec3d> getOriginSupplier, Function<BlockPos, Task> getTargetTask, Function<Vec3d, Optional<BlockPos>> getClosestBlock, Predicate<BlockPos> isValid, Block... blocks) {
+    public DoToClosestBlockTask(Supplier<Vec3> getOriginSupplier, Function<BlockPos, Task> getTargetTask, Function<Vec3, Optional<BlockPos>> getClosestBlock, Predicate<BlockPos> isValid, Block... blocks) {
         _getOriginPos = getOriginSupplier;
         _getTargetTask = getTargetTask;
         _getClosest = getClosestBlock;
@@ -35,7 +35,7 @@ public class DoToClosestBlockTask extends AbstractDoToClosestObjectTask<BlockPos
         _targetBlocks = blocks;
     }
 
-    public DoToClosestBlockTask(Function<BlockPos, Task> getTargetTask, Function<Vec3d, Optional<BlockPos>> getClosestBlock, Predicate<BlockPos> isValid, Block... blocks) {
+    public DoToClosestBlockTask(Function<BlockPos, Task> getTargetTask, Function<Vec3, Optional<BlockPos>> getClosestBlock, Predicate<BlockPos> isValid, Block... blocks) {
         this(null, getTargetTask, getClosestBlock, isValid, blocks);
     }
     public DoToClosestBlockTask(Function<BlockPos, Task> getTargetTask, Predicate<BlockPos> isValid, Block... blocks) {
@@ -46,12 +46,12 @@ public class DoToClosestBlockTask extends AbstractDoToClosestObjectTask<BlockPos
     }
 
     @Override
-    protected Vec3d getPos(AltoClef mod, BlockPos obj) {
+    protected Vec3 getPos(AltoClef mod, BlockPos obj) {
         return WorldHelper.toVec3d(obj);
     }
 
     @Override
-    protected Optional<BlockPos> getClosestTo(AltoClef mod, Vec3d pos) {
+    protected Optional<BlockPos> getClosestTo(AltoClef mod, Vec3 pos) {
         if (_getClosest != null) {
             return _getClosest.apply(pos);
         }
@@ -59,11 +59,11 @@ public class DoToClosestBlockTask extends AbstractDoToClosestObjectTask<BlockPos
     }
 
     @Override
-    protected Vec3d getOriginPos(AltoClef mod) {
+    protected Vec3 getOriginPos(AltoClef mod) {
         if (_getOriginPos != null) {
             return _getOriginPos.get();
         }
-        return mod.getPlayer().getPos();
+        return mod.getPlayer().position();
     }
 
     @Override

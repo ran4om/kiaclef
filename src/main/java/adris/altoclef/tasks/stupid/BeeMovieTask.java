@@ -13,13 +13,13 @@ import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.MiningRequirement;
 import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.WorldHelper;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.BlockPos;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -57,7 +57,7 @@ public class BeeMovieTask extends Task {
         _textParser = new StreamedSignStringParser(input);
 
         _extraSignAcquireTask = new CataloguedResourceTask(new ItemTarget("sign", 256));//TaskCatalogue.getItemTask("sign", 32);
-        _structureMaterialsTask = new MineAndCollectTask(new ItemTarget(new Item[]{Items.DIRT, Items.COBBLESTONE}, STRUCTURE_MATERIALS_BUFFER), new Block[]{Blocks.STONE, Blocks.COBBLESTONE, Blocks.DIRT, Blocks.GRASS, Blocks.GRASS_BLOCK}, MiningRequirement.WOOD);
+        _structureMaterialsTask = new MineAndCollectTask(new ItemTarget(new Item[]{Items.DIRT, Items.COBBLESTONE}, STRUCTURE_MATERIALS_BUFFER), new Block[]{Blocks.STONE, Blocks.COBBLESTONE, Blocks.DIRT, Blocks.SHORT_GRASS, Blocks.GRASS_BLOCK}, MiningRequirement.WOOD);
     }
 
     private static int sign(int num) {
@@ -82,12 +82,12 @@ public class BeeMovieTask extends Task {
         // Avoid breaking the ground below the signs.
         mod.getBehaviour().avoidBlockBreaking(this::isOnPath);
         // Avoid placing blocks where the signs should be placed.
-        mod.getBehaviour().avoidBlockPlacing(block -> isOnPath(block.down()));
+        mod.getBehaviour().avoidBlockPlacing(block -> isOnPath(block.below()));
     }
 
     // Whether a block pos is on the path of its signs.
     private boolean isOnPath(BlockPos pos) {
-        BlockPos bottomStart = _start.down();
+        BlockPos bottomStart = _start.below();
         BlockPos delta = pos.subtract(bottomStart);
         return sign(delta.getX()) == sign(_direction.getX())
                 && sign(delta.getY()) == sign(_direction.getY())
@@ -128,24 +128,24 @@ public class BeeMovieTask extends Task {
         // NOTE: This only checks for the EXISTANCE of signs, NOT that they have the proper text.
         BlockPos currentSignPos = _start;
         while (true) {
-            assert MinecraftClient.getInstance().world != null;
+            assert Minecraft.getInstance().level != null;
 
 
             boolean loaded = mod.getChunkTracker().isChunkLoaded(currentSignPos);
 
             // Clear above
-            BlockState above = MinecraftClient.getInstance().world.getBlockState(currentSignPos.up());
+            BlockState above = Minecraft.getInstance().level.getBlockState(currentSignPos.above());
             if (loaded && !above.isAir() && above.getBlock() != Blocks.WATER) {
                 setDebugState("Clearing block above to prevent hanging...");
-                return new DestroyBlockTask(currentSignPos.up());
+                return new DestroyBlockTask(currentSignPos.above());
             }
 
             // Fortify below
-            //BlockState below = MinecraftClient.getInstance().world.getBlockState(currentSignPos.down());
-            boolean canPlace = WorldHelper.isSolid(mod, currentSignPos.down());//isSideSolidFullSquare(MinecraftClient.getInstance().world, currentSignPos.down(), Direction.UP);
+            //BlockState below = Minecraft.getInstance().world.getBlockState(currentSignPos.down());
+            boolean canPlace = WorldHelper.isSolid(mod, currentSignPos.below());//isSideSolidFullSquare(Minecraft.getInstance().world, currentSignPos.below(), Direction.UP);
             if (loaded && !canPlace) {
                 setDebugState("Placing block below for sign placement...");
-                return new PlaceStructureBlockTask(currentSignPos.down());
+                return new PlaceStructureBlockTask(currentSignPos.below());
             }
 
             // Need a sign at this point.
@@ -162,7 +162,7 @@ public class BeeMovieTask extends Task {
             }
 
 
-            BlockState blockAt = MinecraftClient.getInstance().world.getBlockState(currentSignPos);
+            BlockState blockAt = Minecraft.getInstance().level.getBlockState(currentSignPos);
 
 
             if (loaded && !isSign(blockAt.getBlock())) {
@@ -171,7 +171,7 @@ public class BeeMovieTask extends Task {
                 return _currentPlace;
             }
 
-            currentSignPos = currentSignPos.add(_direction);
+            currentSignPos = currentSignPos.offset(_direction);
             signCounter++;
         }
     }
@@ -253,7 +253,7 @@ public class BeeMovieTask extends Task {
 
                 // Can be a special delimiter for a new sign.
 
-                if (c == '\n' || MinecraftClient.getInstance().textRenderer.getWidth(line.toString()) > SIGN_TEXT_MAX_WIDTH) {
+                if (c == '\n' || Minecraft.getInstance().font.width(line.toString()) > SIGN_TEXT_MAX_WIDTH) {
                     line.delete(0, line.length());
                     line.append(c);
                     lineCount++;

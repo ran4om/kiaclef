@@ -1,0 +1,413 @@
+package adris.altoclef.runtimetest;
+
+import adris.altoclef.AltoClef;
+import adris.altoclef.TaskCatalogue;
+import adris.altoclef.tasks.resources.ShearAndCollectBlockTask;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Consumer;
+
+/** Exercises both catalogued azalea leaf targets through normal @get with vanilla shears drops. */
+public final class AzaleaLeavesAcceptanceScenario {
+    private enum Phase { NEW, PREPARING, WAIT_SYNC, COLLECT, VERIFY, DONE, FAILED }
+
+    private static final int SETUP_TIMEOUT_TICKS = 1200;
+    private static final int TASK_TIMEOUT_TICKS = 12000;
+    private static final int VERIFY_TIMEOUT_TICKS = 400;
+    private static final int POLL_INTERVAL_TICKS = 10;
+
+    private final AltoClef mod;
+    private final Consumer<String> append;
+    private final Consumer<String> failure;
+    private final Runnable success;
+    private volatile Phase phase = Phase.NEW;
+    private volatile boolean setupReady;
+    private volatile String setupState = "not-started";
+    private volatile String commandCompletion;
+    private volatile String commandFailure;
+    private volatile boolean pollOutstanding;
+    private volatile boolean pollReady;
+    private volatile String pollState = "not-polled";
+    private volatile List<ItemStack> serverInventory = List.of();
+    private volatile int serverAzaleaLeaves;
+    private volatile int serverFloweringLeaves;
+    private volatile int serverShearsDamage;
+    private volatile float serverHealth;
+    private volatile int serverFoodLevel;
+    private volatile boolean serverPlayerAlive;
+    private volatile boolean serverAzaleaAir;
+    private volatile boolean serverFloweringAir;
+    private volatile int serverArenaItemEntities;
+    private volatile boolean serverUiClean;
+    private volatile boolean sawShearAndCollectTask;
+    private long phaseStarted;
+    private long nextPollAt;
+    private UUID playerId;
+    private BlockPos azaleaPos;
+    private BlockPos floweringPos;
+    private AABB fixtureBounds;
+
+    public AzaleaLeavesAcceptanceScenario(AltoClef mod, Consumer<String> append,
+                                         Consumer<String> failure, Runnable success) {
+        this.mod = Objects.requireNonNull(mod, "mod");
+        this.append = Objects.requireNonNull(append, "append");
+        this.failure = Objects.requireNonNull(failure, "failure");
+        this.success = Objects.requireNonNull(success, "success");
+    }
+
+    /** Call once per client tick until the supplied success or failure callback runs. */
+    public void tick() {
+        if (phase == Phase.DONE || phase == Phase.FAILED) return;
+        if (phase == Phase.NEW) {
+            beginSetup();
+            return;
+        }
+        if (phase == Phase.PREPARING) {
+            if (setupReady) {
+                if (!"ok".equals(setupState)) fail("Azalea leaf fixture setup failed: " + setupState);
+                else {
+                    append.accept("AZALEA_LEAVES_SETUP\tok\t" + setupSnapshot());
+                    phase = Phase.WAIT_SYNC;
+                    phaseStarted = clientTick();
+                }
+            } else if (timedOut(SETUP_TIMEOUT_TICKS)) fail("Timed out preparing azalea leaf fixture: " + setupState);
+            return;
+        }
+        if (commandFailure != null) {
+            fail("Azalea leaf command failed: " + commandFailure);
+            return;
+        }
+        if (phase == Phase.WAIT_SYNC) {
+            if (fixtureSynchronized()) startGet();
+            else if (timedOut(VERIFY_TIMEOUT_TICKS)) fail("Azalea leaf fixture did not synchronize: " + clientSnapshot());
+            return;
+        }
+        if (phase == Phase.COLLECT) {
+            traceShearAndCollectTask();
+            if ("azalea-leaves".equals(commandCompletion)) {
+                commandCompletion = null;
+                phase = Phase.VERIFY;
+                phaseStarted = clientTick();
+                nextPollAt = phaseStarted;
+                requestPoll();
+            } else if (timedOut(TASK_TIMEOUT_TICKS)) {
+                fail("Timed out collecting both azalea leaf items; tasks=" + mod.getUserTaskChain().getTasks());
+            }
+            return;
+        }
+        if (phase == Phase.VERIFY) {
+            if (pollReady) {
+                pollReady = false;
+                append.accept("AZALEA_LEAVES_FINAL_POLL\t" + pollState);
+                if (finalStateIsValid() && clientMatchesServer()) finish();
+                else if (timedOut(VERIFY_TIMEOUT_TICKS)) {
+                    fail("Azalea leaf final state mismatch: server=" + pollState + ", client=" + clientSnapshot());
+                } else nextPollAt = clientTick() + POLL_INTERVAL_TICKS;
+            } else if (timedOut(VERIFY_TIMEOUT_TICKS)) {
+                fail("Timed out verifying azalea leaf collection: " + pollState);
+            } else if (!pollOutstanding && clientTick() >= nextPollAt) requestPoll();
+        }
+    }
+
+    private void beginSetup() {
+        Minecraft client = Minecraft.getInstance();
+        MinecraftServer server = client.getSingleplayerServer();
+        if (server == null || client.player == null || client.level == null) {
+            fail("Azalea leaf acceptance requires an active integrated world");
+            return;
+        }
+        if (!TaskCatalogue.taskExists("azalea_leaves") || !TaskCatalogue.taskExists("flowering_azalea_leaves")) {
+            fail("Azalea leaf catalogue entries are missing");
+            return;
+        }
+        playerId = client.player.getUUID();
+        mod.cancelUserTask();
+        phase = Phase.PREPARING;
+        phaseStarted = clientTick();
+        server.execute(() -> prepareFixture(server));
+        append.accept("AZALEA_LEAVES_SETUP\tqueued\tclear inventory; seed one azalea-leaf block, one flowering-azalea-leaf block, and one shears; command=@get [azalea_leaves 1, flowering_azalea_leaves 1]");
+    }
+
+    private void prepareFixture(MinecraftServer server) {
+        ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+        if (player == null) { publishSetup("player=null"); return; }
+        ServerLevel level = (ServerLevel) player.level();
+        BlockPos base = player.blockPosition();
+        int floorY = base.getY() - 1;
+        fixtureBounds = new AABB(base.getX() - 8, floorY, base.getZ() - 8,
+                base.getX() + 9, floorY + 7, base.getZ() + 9);
+        azaleaPos = new BlockPos(base.getX() + 3, floorY + 1, base.getZ() + 1);
+        floweringPos = new BlockPos(base.getX() + 4, floorY + 1, base.getZ() + 1);
+        player.closeContainer();
+        player.getInventory().clearContent();
+        for (int slot = 1; slot <= 4; slot++) player.inventoryMenu.getSlot(slot).set(ItemStack.EMPTY);
+        player.inventoryMenu.setCarried(ItemStack.EMPTY);
+        player.getInventory().setItem(0, new ItemStack(Items.SHEARS));
+        player.getInventory().setSelectedSlot(0);
+        player.setGameMode(GameType.SURVIVAL);
+        player.setHealth(player.getMaxHealth());
+        player.getFoodData().setFoodLevel(20);
+        player.getFoodData().setSaturation(5.0f);
+        for (int x = base.getX() - 8; x <= base.getX() + 8; x++) {
+            for (int z = base.getZ() - 8; z <= base.getZ() + 8; z++) {
+                BlockPos floor = new BlockPos(x, floorY, z);
+                level.getChunkAt(floor);
+                level.setBlock(floor, Blocks.STONE.defaultBlockState(), 3);
+                for (int y = floorY + 1; y <= floorY + 5; y++) {
+                    level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 3);
+                }
+            }
+        }
+        for (ItemEntity item : level.getEntitiesOfClass(ItemEntity.class, fixtureBounds)) item.discard();
+        level.setBlock(azaleaPos, persistent(Blocks.AZALEA_LEAVES), 3);
+        level.setBlock(floweringPos, persistent(Blocks.FLOWERING_AZALEA_LEAVES), 3);
+        boolean valid = player.getInventory().getItem(0).is(Items.SHEARS)
+                && count(player, Items.AZALEA_LEAVES) == 0 && count(player, Items.FLOWERING_AZALEA_LEAVES) == 0
+                && level.getBlockState(azaleaPos).is(Blocks.AZALEA_LEAVES)
+                && level.getBlockState(floweringPos).is(Blocks.FLOWERING_AZALEA_LEAVES)
+                && inventoryCount(player) == 1
+                && droppedItemCount(level, fixtureBounds) == 0
+                && cleanUi(player) && player.gameMode.getGameModeForPlayer() == GameType.SURVIVAL;
+        player.inventoryMenu.broadcastChanges();
+        publishSetup(valid ? "ok" : "invalid:" + snapshot(player, level));
+    }
+
+    private static BlockState persistent(Block block) {
+        BlockState state = block.defaultBlockState();
+        if (state.hasProperty(LeavesBlock.PERSISTENT)) state = state.setValue(LeavesBlock.PERSISTENT, true);
+        return state;
+    }
+
+    private void startGet() {
+        phase = Phase.COLLECT;
+        phaseStarted = clientTick();
+        var previous = mod.getUserTaskChain().getLastCompletionSnapshot();
+        String command = mod.getModSettings().getCommandPrefix() + "get [azalea_leaves 1, flowering_azalea_leaves 1]";
+        append.accept("COMMAND\t" + command + "\tshearsSeeded=1\tleavesSeeded=0");
+        try {
+            AltoClef.getCommandExecutor().execute(command, () -> {
+                var completion = mod.getUserTaskChain().getLastCompletionSnapshot();
+                if (completion == null || completion == previous) commandFailure = "callback had no new completion snapshot";
+                else if (completion.failure() != null || completion.cancelled()) {
+                    commandFailure = completion.failure() == null ? "cancelled" : completion.failure().reason();
+                } else commandCompletion = "azalea-leaves";
+            }, error -> commandFailure = command + ": " + error.getMessage());
+        } catch (Throwable error) { commandFailure = "could not execute " + command + ": " + error; }
+    }
+
+    private boolean fixtureSynchronized() {
+        Minecraft client = Minecraft.getInstance();
+        return client.level != null && client.player != null
+                && client.level.getBlockState(azaleaPos).is(Blocks.AZALEA_LEAVES)
+                && client.level.getBlockState(floweringPos).is(Blocks.FLOWERING_AZALEA_LEAVES)
+                && client.player.getInventory().getItem(0).is(Items.SHEARS)
+                && cleanUi(client.player);
+    }
+
+    private boolean finalStateIsValid() {
+        Minecraft client = Minecraft.getInstance();
+        return client.level != null && serverAzaleaLeaves == 1 && serverFloweringLeaves == 1
+                && serverShearsDamage == 2 && serverPlayerAlive && serverHealth > 0 && serverFoodLevel > 0
+                && serverAzaleaAir && serverFloweringAir && serverArenaItemEntities == 0
+                && inventoryCount(serverInventory) == 3 && validCollectedInventory(serverInventory)
+                && serverUiClean && sawShearAndCollectTask
+                && client.player != null
+                && client.player.isAlive() && client.player.getHealth() > 0
+                && client.gameMode != null && client.gameMode.getPlayerMode() == GameType.SURVIVAL
+                && client.player.getHealth() == serverHealth
+                && client.player.getFoodData().getFoodLevel() == serverFoodLevel
+                && count(client.player, Items.AZALEA_LEAVES) == 1
+                && count(client.player, Items.FLOWERING_AZALEA_LEAVES) == 1
+                && inventoryCount(client.player) == 3
+                && expectedDamagedShearsMatches(client.player)
+                && cleanUi(client.player)
+                && client.level.getBlockState(azaleaPos).isAir()
+                && client.level.getBlockState(floweringPos).isAir();
+    }
+
+    private boolean clientMatchesServer() {
+        Minecraft client = Minecraft.getInstance();
+        if (client.player == null || client.level == null || !client.player.isAlive()
+                || client.player.getHealth() != serverHealth
+                || client.player.getFoodData().getFoodLevel() != serverFoodLevel
+                || client.gameMode == null || client.gameMode.getPlayerMode() != GameType.SURVIVAL
+                || !expectedDamagedShearsMatches(client.player)) return false;
+        for (int slot = 0; slot < serverInventory.size(); slot++) {
+            if (!ItemStack.matches(serverInventory.get(slot), client.player.getInventory().getItem(slot))) return false;
+        }
+        return serverAzaleaLeaves == count(client.player, Items.AZALEA_LEAVES)
+                && serverFloweringLeaves == count(client.player, Items.FLOWERING_AZALEA_LEAVES)
+                && client.level.getBlockState(azaleaPos).isAir()
+                && client.level.getBlockState(floweringPos).isAir();
+    }
+
+    private void requestPoll() {
+        Minecraft client = Minecraft.getInstance();
+        MinecraftServer server = client.getSingleplayerServer();
+        if (server == null || playerId == null) { fail("Integrated server disappeared during verification"); return; }
+        pollOutstanding = true;
+        server.execute(() -> {
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player == null || !(player.level() instanceof ServerLevel level)) {
+                pollState = "player/level missing";
+            } else {
+                serverAzaleaLeaves = count(player, Items.AZALEA_LEAVES);
+                serverFloweringLeaves = count(player, Items.FLOWERING_AZALEA_LEAVES);
+                serverShearsDamage = shearsDamage(player);
+                serverHealth = player.getHealth();
+                serverFoodLevel = player.getFoodData().getFoodLevel();
+                serverPlayerAlive = player.isAlive()
+                        && player.gameMode.getGameModeForPlayer() == GameType.SURVIVAL;
+                serverAzaleaAir = level.getBlockState(azaleaPos).isAir();
+                serverFloweringAir = level.getBlockState(floweringPos).isAir();
+                serverArenaItemEntities = droppedItemCount(level, fixtureBounds);
+                serverInventory = inventorySnapshot(player);
+                serverUiClean = cleanUi(player);
+                pollState = snapshot(player, level);
+            }
+            pollReady = true;
+            pollOutstanding = false;
+        });
+    }
+
+    private String setupSnapshot() {
+        Minecraft client = Minecraft.getInstance();
+        return client.player == null ? "player=null" : "inventory=" + inventorySnapshot(client.player)
+                + ",azaleaPos=" + azaleaPos + ",floweringPos=" + floweringPos + ",cleanUI=" + cleanUi(client.player);
+    }
+
+    private String clientSnapshot() {
+        Minecraft client = Minecraft.getInstance();
+        if (client.player == null || client.level == null) return "player/level=null";
+        return "inventory=" + inventorySnapshot(client.player) + ",azalea="
+                + client.level.getBlockState(azaleaPos) + ",flowering=" + client.level.getBlockState(floweringPos)
+                + ",cleanUI=" + cleanUi(client.player);
+    }
+
+    private String snapshot(ServerPlayer player, ServerLevel level) {
+        return "inventory=" + inventorySnapshot(player) + ",azaleaLeaves=" + count(player, Items.AZALEA_LEAVES)
+                + ",floweringLeaves=" + count(player, Items.FLOWERING_AZALEA_LEAVES)
+                + ",azaleaState=" + level.getBlockState(azaleaPos)
+                + ",floweringState=" + level.getBlockState(floweringPos)
+                + ",arenaItemEntities=" + droppedItemCount(level, fixtureBounds)
+                + ",shearsDamage=" + shearsDamage(player) + ",alive=" + player.isAlive()
+                + ",mode=" + player.gameMode.getGameModeForPlayer() + ",health=" + player.getHealth()
+                + ",food=" + player.getFoodData().getFoodLevel()
+                + ",cursor=" + player.containerMenu.getCarried() + ",cleanUI=" + cleanUi(player);
+    }
+
+    private static boolean cleanUi(Player player) {
+        if (player.containerMenu != player.inventoryMenu || !player.containerMenu.getCarried().isEmpty()) return false;
+        for (int slot = 1; slot <= 4; slot++) if (!player.inventoryMenu.getSlot(slot).getItem().isEmpty()) return false;
+        return true;
+    }
+
+    private void traceShearAndCollectTask() {
+        if (sawShearAndCollectTask) return;
+        boolean present = mod.getUserTaskChain().getTasks().stream()
+                .anyMatch(task -> task instanceof ShearAndCollectBlockTask);
+        if (present) {
+            sawShearAndCollectTask = true;
+            append.accept("TASK_TRACE\tShearAndCollectBlockTask\tobserved during @get");
+        }
+    }
+
+    private static int inventoryCount(Player player) {
+        int total = 0;
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            if (!player.getInventory().getItem(slot).isEmpty()) total++;
+        }
+        return total;
+    }
+
+    private static int inventoryCount(List<ItemStack> stacks) {
+        int total = 0;
+        for (ItemStack stack : stacks) if (!stack.isEmpty()) total++;
+        return total;
+    }
+
+    private static boolean validCollectedInventory(List<ItemStack> stacks) {
+        int leaves = 0;
+        int flowering = 0;
+        int shears = 0;
+        for (ItemStack stack : stacks) {
+            if (stack.isEmpty()) continue;
+            if (stack.is(Items.AZALEA_LEAVES) && stack.getCount() == 1) leaves++;
+            else if (stack.is(Items.FLOWERING_AZALEA_LEAVES) && stack.getCount() == 1) flowering++;
+            else if (stack.is(Items.SHEARS) && stack.getCount() == 1 && stack.getDamageValue() == 2) shears++;
+            else return false;
+        }
+        return leaves == 1 && flowering == 1 && shears == 1;
+    }
+
+    private static int shearsDamage(Player player) {
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (stack.is(Items.SHEARS)) return stack.getDamageValue();
+        }
+        return -1;
+    }
+
+    private static boolean expectedDamagedShearsMatches(Player player) {
+        ItemStack expected = new ItemStack(Items.SHEARS);
+        expected.setDamageValue(2);
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (stack.is(Items.SHEARS)) return stack.getCount() == 1 && ItemStack.matches(expected, stack);
+        }
+        return false;
+    }
+
+    private static int droppedItemCount(ServerLevel level, AABB bounds) {
+        return level.getEntitiesOfClass(ItemEntity.class, bounds).size();
+    }
+
+    private static List<ItemStack> inventorySnapshot(Player player) {
+        List<ItemStack> result = new ArrayList<>(36);
+        for (int slot = 0; slot < 36; slot++) result.add(player.getInventory().getItem(slot).copy());
+        return List.copyOf(result);
+    }
+
+    private static int count(Player player, Item item) {
+        int result = 0;
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (stack.is(item)) result += stack.getCount();
+        }
+        return result;
+    }
+
+    private void publishSetup(String value) { setupState = value; setupReady = true; }
+    private boolean timedOut(int ticks) { return clientTick() - phaseStarted > ticks; }
+    private static long clientTick() { return Minecraft.getInstance().level == null ? 0 : Minecraft.getInstance().level.getGameTime(); }
+    private void finish() {
+        append.accept("ASSERT\texactly one of each azalea leaf plus vanilla shears at damage 2; ShearAndCollectBlockTask traced; arena drops absent; server/client source AIR and inventory, survival health/food synchronized; UI clean");
+        append.accept("AZALEA_LEAVES_ACCEPTANCE\tPASS\tvanilla shears leaf-drop paths");
+        phase = Phase.DONE;
+        success.run();
+    }
+    private void fail(String reason) {
+        phase = Phase.FAILED;
+        append.accept("AZALEA_LEAVES_ACCEPTANCE\tFAIL\t" + reason);
+        failure.accept(reason);
+    }
+}

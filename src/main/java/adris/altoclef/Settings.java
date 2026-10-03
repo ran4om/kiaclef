@@ -14,9 +14,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.collect.Streams;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.core.BlockPos;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -78,6 +78,12 @@ public class Settings implements IFailableConfigFile {
      * The delay between moving items for crafting/furnace/any kind of inventory movement.
      */
     private float containerItemMoveDelay = 0.2f;
+
+    /** Maximum consecutive pause time for an automated schematic build, in seconds. Set to 0 or less to disable. */
+    private int schematicBuildPausedTimeoutSeconds = 600;
+
+    /** Maximum active time without schematic placement or layer progress, in seconds. Set to 0 or less to disable. */
+    private int schematicBuildNoProgressTimeoutSeconds = 600;
 
     /**
      * If true, use Minecraft's crafting recipe book to place items into
@@ -423,7 +429,7 @@ public class Settings implements IFailableConfigFile {
 
 
     private static boolean idArrayContainsItem(Item item, int[] ids) {
-        int id = Item.getRawId(item);
+        int id = Item.getId(item);
         for (int check : ids) {
             if (check == id) return true;
         }
@@ -463,6 +469,14 @@ public class Settings implements IFailableConfigFile {
 
     public float getContainerItemMoveDelay() {
         return containerItemMoveDelay;
+    }
+
+    public int getSchematicBuildPausedTimeoutSeconds() {
+        return schematicBuildPausedTimeoutSeconds;
+    }
+
+    public int getSchematicBuildNoProgressTimeoutSeconds() {
+        return schematicBuildNoProgressTimeoutSeconds;
     }
 
     public boolean shouldUseCraftingBookToCraft() {

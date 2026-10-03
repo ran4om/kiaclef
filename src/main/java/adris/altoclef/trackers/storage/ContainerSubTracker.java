@@ -3,21 +3,45 @@ package adris.altoclef.trackers.storage;
 import adris.altoclef.Debug;
 import adris.altoclef.eventbus.EventBus;
 import adris.altoclef.eventbus.events.BlockInteractEvent;
+import adris.altoclef.eventbus.events.NonBlockInteractEvent;
 import adris.altoclef.eventbus.events.ScreenOpenEvent;
 import adris.altoclef.trackers.Tracker;
 import adris.altoclef.trackers.TrackerManager;
 import adris.altoclef.util.Dimension;
 import adris.altoclef.util.helpers.WorldHelper;
-import net.minecraft.block.*;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ingame.*;
-import net.minecraft.item.Item;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.util.Pair;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.AbstractFurnaceBlock;
+import net.minecraft.world.level.block.BarrelBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.DispenserBlock;
+import net.minecraft.world.level.block.HopperBlock;
+import net.minecraft.world.level.block.BrewingStandBlock;
+import net.minecraft.world.level.block.ShulkerBoxBlock;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.MenuAccess;
+import net.minecraft.client.gui.screens.inventory.BlastFurnaceScreen;
+import net.minecraft.client.gui.screens.inventory.BrewingStandScreen;
+import net.minecraft.client.gui.screens.inventory.FurnaceScreen;
+import net.minecraft.client.gui.screens.inventory.ContainerScreen;
+import net.minecraft.client.gui.screens.inventory.DispenserScreen;
+import net.minecraft.client.gui.screens.inventory.HopperScreen;
+import net.minecraft.client.gui.screens.inventory.ShulkerBoxScreen;
+import net.minecraft.client.gui.screens.inventory.SmokerScreen;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.AbstractFurnaceMenu;
+import net.minecraft.world.inventory.BrewingStandMenu;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.inventory.DispenserMenu;
+import net.minecraft.world.inventory.HopperMenu;
+import net.minecraft.world.inventory.ShulkerBoxMenu;
+import adris.altoclef.util.Pair;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -27,9 +51,7 @@ import java.util.function.Predicate;
  */
 public class ContainerSubTracker extends Tracker {
 
-    private boolean _containerOpen;
-    private BlockPos _lastBlockPosInteraction;
-    private Block _lastBlockInteraction;
+    private final ContainerMenuSession _containerSession = new ContainerMenuSession();
     private final HashMap<Dimension, HashMap<BlockPos, ContainerCache>> _containerCaches = new HashMap<>();
     private ContainerCache _enderChestCache;
     private boolean _hasSentError;
@@ -44,92 +66,137 @@ public class ContainerSubTracker extends Tracker {
         EventBus.subscribe(BlockInteractEvent.class, evt -> {
             BlockPos blockPos = evt.hitResult.getBlockPos();
             BlockState bs = evt.world.getBlockState(blockPos);
-            onBlockInteract(blockPos, bs.getBlock());
+            Minecraft minecraft = Minecraft.getInstance();
+            LocalPlayer player = minecraft.player;
+            if (player != null && minecraft.level == evt.world) {
+                onBlockInteract(evt.world, player, player.containerMenu, blockPos, bs.getBlock(),
+                        evt.world.getGameTime());
+            }
         });
         EventBus.subscribe(ScreenOpenEvent.class, evt -> {
-            if (evt.preOpen) {
-                onScreenOpenFirstTick(evt.screen);
-            } else {
-                if (evt.screen == null)
-                    onScreenClose();
-            }
+            if (!evt.preOpen) onScreenChanged(evt.screen);
         });
+        EventBus.subscribe(NonBlockInteractEvent.class, evt -> _containerSession.clearPendingInteraction());
     }
 
-    private void onBlockInteract(BlockPos pos, Block block) {
-        if (block instanceof AbstractFurnaceBlock ||
-            block instanceof ChestBlock ||
-            block.equals(Blocks.ENDER_CHEST) ||
-            block instanceof HopperBlock ||
-            block instanceof ShulkerBoxBlock ||
-            block instanceof DispenserBlock ||
-            block instanceof BarrelBlock) {
-            _lastBlockPosInteraction = pos;
-            _lastBlockInteraction = block;
+    private void onBlockInteract(Object world, Object player, Object originMenu,
+                                 BlockPos pos, Block block, long currentTick) {
+        if (isTrackedContainerBlock(block)) {
+            _containerSession.noteInteraction(world, player, originMenu, pos, block, currentTick);
         }
     }
-    private void onScreenOpenFirstTick(final Screen screen) {
-        _containerOpen = screen instanceof FurnaceScreen
-                || screen instanceof GenericContainerScreen
-                || screen instanceof SmokerScreen
-                || screen instanceof BlastFurnaceScreen
-                || screen instanceof HopperScreen
-                || screen instanceof ShulkerBoxScreen;
-    }
-    private void onScreenClose() {
-        _containerOpen = false;
-        _lastBlockPosInteraction = null;
-        _lastBlockInteraction = null;
+
+    private void onScreenChanged(final Screen screen) {
+        Minecraft minecraft = Minecraft.getInstance();
+        LocalPlayer player = minecraft.player;
+        AbstractContainerMenu playerMenu = player == null ? null : player.containerMenu;
+        boolean trackedScreen = screen != null && isTrackedContainerScreen(screen.getClass());
+        boolean screenMenuMatchesPlayerMenu = trackedScreen
+                && screen instanceof MenuAccess<?> menuAccess
+                && menuAccess.getMenu() == playerMenu;
+
+        long currentTick = minecraft.level == null ? 0 : minecraft.level.getGameTime();
+        _containerSession.onScreenChanged(minecraft.level, player, playerMenu, trackedScreen, currentTick,
+                screenMenuMatchesPlayerMenu,
+                block -> containerMenuMatchesBlock(block, playerMenu),
+                (position, block) -> minecraft.level != null
+                        && minecraft.level.getBlockState(position).getBlock() == block);
         _hasSentError = false;
     }
+
+    static boolean isTrackedContainerBlock(Block block) {
+        return block instanceof AbstractFurnaceBlock
+                || block instanceof ChestBlock
+                || block.equals(Blocks.ENDER_CHEST)
+                || block instanceof HopperBlock
+                || block instanceof ShulkerBoxBlock
+                || block instanceof DispenserBlock
+                || block instanceof BarrelBlock
+                || block instanceof BrewingStandBlock;
+    }
+
+    static boolean isTrackedContainerScreen(Class<?> screenClass) {
+        return FurnaceScreen.class.isAssignableFrom(screenClass)
+                || ContainerScreen.class.isAssignableFrom(screenClass)
+                || DispenserScreen.class.isAssignableFrom(screenClass)
+                || SmokerScreen.class.isAssignableFrom(screenClass)
+                || BlastFurnaceScreen.class.isAssignableFrom(screenClass)
+                || HopperScreen.class.isAssignableFrom(screenClass)
+                || ShulkerBoxScreen.class.isAssignableFrom(screenClass)
+                || BrewingStandScreen.class.isAssignableFrom(screenClass);
+    }
     public void onServerTick() {
-        if (MinecraftClient.getInstance().player == null)
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level == null) {
+            _containerSession.clear();
             return;
-        // If we haven't registered interacting with a block, try the currently "looking at" block
-        if (_containerOpen && _lastBlockPosInteraction == null && _lastBlockInteraction == null) {
-            if (MinecraftClient.getInstance().crosshairTarget instanceof BlockHitResult bhit) {
-                Debug.logWarning("Screen open but no block interaction detected, using the block we're currently looking at.");
-                _lastBlockPosInteraction = bhit.getBlockPos();
-                _lastBlockInteraction = _mod.getWorld().getBlockState(_lastBlockPosInteraction).getBlock();
+        }
+        _containerSession.expirePendingInteraction(minecraft.level.getGameTime());
+
+        AbstractContainerMenu handler = minecraft.player.containerMenu;
+        Optional<ContainerMenuSession.BoundContainer> openContainer = getBoundContainer(handler);
+        if (openContainer.isEmpty()) return;
+        ContainerMenuSession.BoundContainer bound = openContainer.get();
+        BlockPos containerPos = bound.position();
+        HashMap<BlockPos, ContainerCache> dimCache = _containerCaches.get(WorldHelper.getCurrentDimension());
+
+        // Container Type Mismatch, reset.
+        if (dimCache.containsKey(containerPos)) {
+            ContainerType currentType = dimCache.get(containerPos).getContainerType();
+            if (!ContainerType.screenHandlerMatches(currentType, handler)) {
+                if (!_hasSentError) {
+                    Debug.logMessage("Mismatched container screen at " + containerPos.toShortString()
+                            + ", will overwrite container data: " + handler.getType() + " ?=> " + currentType);
+                    _hasSentError = true;
+                }
+                dimCache.remove(containerPos);
             }
         }
-        if (_containerOpen && _lastBlockPosInteraction != null && _lastBlockInteraction != null) {
-            BlockPos containerPos = _lastBlockPosInteraction;
-            ScreenHandler handler = MinecraftClient.getInstance().player.currentScreenHandler;
-            if (handler == null)
-                return;
 
-            HashMap<BlockPos, ContainerCache> dimCache = _containerCaches.get(WorldHelper.getCurrentDimension());
-
-            // Container Type Mismatch, reset.
-            if (dimCache.containsKey(containerPos)) {
-                ContainerType currentType = dimCache.get(containerPos).getContainerType();
-                if (!ContainerType.screenHandlerMatches(currentType, handler)) {
-                    if (!_hasSentError) {
-                        Debug.logMessage("Mismatched container screen at " + containerPos.toShortString() + ", will overwrite container data: " + handler.getType() + " ?=> " + currentType);
-                        _hasSentError = true;
-                    }
-                    dimCache.remove(containerPos);
-                }
+        // New container found
+        if (!dimCache.containsKey(containerPos)) {
+            ContainerType interactType = ContainerType.getFromBlock(bound.block());
+            ContainerCache newCache = new ContainerCache(WorldHelper.getCurrentDimension(), containerPos, interactType);
+            dimCache.put(containerPos, newCache);
+            if (interactType == ContainerType.ENDER_CHEST) {
+                _enderChestCache = newCache;
             }
-
-            // New container found
-            if (!dimCache.containsKey(containerPos)) {
-                Block containerBlock = _lastBlockInteraction;
-                ContainerType interactType = ContainerType.getFromBlock(containerBlock);
-                ContainerCache newCache = new ContainerCache(WorldHelper.getCurrentDimension(), containerPos, interactType);
-                dimCache.put(containerPos, newCache);
-                // Special ender chest cache
-                if (interactType == ContainerType.ENDER_CHEST) {
-                    _enderChestCache = newCache;
-                }
-            }
-
-            ContainerCache toUpdate = dimCache.get(containerPos);
-            toUpdate.update(handler, stack -> {
-
-            });
         }
+
+        ContainerCache toUpdate = dimCache.get(containerPos);
+        toUpdate.update(handler, stack -> { });
+    }
+
+    private Optional<ContainerMenuSession.BoundContainer> getBoundContainer(AbstractContainerMenu menu) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level == null || menu == null) return Optional.empty();
+        Screen screen = minecraft.gui.screen();
+        if (screen == null || !isTrackedContainerScreen(screen.getClass())
+                || !(screen instanceof MenuAccess<?> menuAccess)
+                || menuAccess.getMenu() != menu) return Optional.empty();
+        return _containerSession.getBoundContainer(minecraft.level, minecraft.player, menu,
+                (position, block) -> minecraft.level.getBlockState(position).getBlock() == block);
+    }
+
+    public Optional<BlockPos> getContainerPositionForMenu(AbstractContainerMenu menu) {
+        return getBoundContainer(menu).map(ContainerMenuSession.BoundContainer::position);
+    }
+
+    static boolean containerMenuMatchesBlock(Block block, AbstractContainerMenu menu) {
+        return menu != null && containerMenuClassMatchesBlock(block, menu.getClass());
+    }
+
+    static boolean containerMenuClassMatchesBlock(Block block, Class<?> menuClass) {
+        if (block == null || menuClass == null) return false;
+        if (block instanceof ChestBlock || block == Blocks.ENDER_CHEST || block instanceof BarrelBlock) {
+            return ChestMenu.class.isAssignableFrom(menuClass);
+        }
+        if (block instanceof ShulkerBoxBlock) return ShulkerBoxMenu.class.isAssignableFrom(menuClass);
+        if (block instanceof AbstractFurnaceBlock) return AbstractFurnaceMenu.class.isAssignableFrom(menuClass);
+        if (block instanceof BrewingStandBlock) return BrewingStandMenu.class.isAssignableFrom(menuClass);
+        if (block instanceof DispenserBlock) return DispenserMenu.class.isAssignableFrom(menuClass);
+        if (block instanceof HopperBlock) return HopperMenu.class.isAssignableFrom(menuClass);
+        return false;
     }
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
@@ -184,7 +251,7 @@ public class ContainerSubTracker extends Tracker {
         return getCachedContainers(cache -> typeSet.contains(cache.getContainerType()));
     }
 
-    public Optional<ContainerCache> getClosestTo(Vec3d pos, Predicate<ContainerCache> accept) {
+    public Optional<ContainerCache> getClosestTo(Vec3 pos, Predicate<ContainerCache> accept) {
         double bestDist = Double.POSITIVE_INFINITY;
         Dimension dim = WorldHelper.getCurrentDimension();
 
@@ -196,7 +263,7 @@ public class ContainerSubTracker extends Tracker {
                 toRemove.add(cache.getBlockPos());
                 continue;
             }
-            double dist = cache.getBlockPos().getSquaredDistance(pos);
+            double dist = cache.getBlockPos().distToCenterSqr(pos);
             if (dist < bestDist) {
                 if (accept.test(cache)) {
                     bestDist = dist;
@@ -210,7 +277,7 @@ public class ContainerSubTracker extends Tracker {
         }
         return Optional.ofNullable(bestCache);
     }
-    public Optional<ContainerCache> getClosestTo(Vec3d pos, ContainerType ...types) {
+    public Optional<ContainerCache> getClosestTo(Vec3 pos, ContainerType ...types) {
         Set<ContainerType> typeSet = new HashSet<>(Arrays.asList(types));
         return getClosestTo(pos, cache -> typeSet.contains(cache.getContainerType()));
     }
@@ -218,7 +285,7 @@ public class ContainerSubTracker extends Tracker {
     public List<ContainerCache> getContainersWithItem(Item ...items) {
         return getCachedContainers(cache -> cache.hasItem(items));
     }
-    public Optional<ContainerCache> getClosestWithItem(Vec3d pos, Item ...items) {
+    public Optional<ContainerCache> getClosestWithItem(Vec3 pos, Item ...items) {
         return getClosestTo(pos, cache -> cache.hasItem(items));
     }
 
@@ -236,7 +303,9 @@ public class ContainerSubTracker extends Tracker {
     }
 
     public BlockPos getLastBlockPosInteraction() {
-        return _lastBlockPosInteraction;
+        Minecraft minecraft = Minecraft.getInstance();
+        AbstractContainerMenu menu = minecraft.player == null ? null : minecraft.player.containerMenu;
+        return getBoundContainer(menu).map(ContainerMenuSession.BoundContainer::position).orElse(null);
     }
 
     @Override
@@ -249,6 +318,8 @@ public class ContainerSubTracker extends Tracker {
         for (Dimension key : _containerCaches.keySet()) {
             _containerCaches.get(key).clear();
         }
+        _containerSession.clear();
+        _hasSentError = false;
     }
 
 }

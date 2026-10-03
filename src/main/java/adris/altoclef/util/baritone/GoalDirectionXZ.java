@@ -3,7 +3,7 @@ package adris.altoclef.util.baritone;
 import baritone.Baritone;
 import baritone.api.BaritoneAPI;
 import baritone.api.pathing.goals.Goal;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.phys.Vec3;
 
 public class GoalDirectionXZ implements Goal {
     private final double originx;
@@ -13,10 +13,10 @@ public class GoalDirectionXZ implements Goal {
 
     private final double _sidePenalty;
 
-    public GoalDirectionXZ(Vec3d origin, Vec3d offset, double sidePenalty) {
-        this.originx = origin.getX();
+    public GoalDirectionXZ(Vec3 origin, Vec3 offset, double sidePenalty) {
+        this.originx = origin.x;
         //this.y = origin.getY();
-        this.originz = origin.getZ();
+        this.originz = origin.z;
         offset = offset.multiply(1, 0, 1);
         offset = offset.normalize();
         this.dirx = offset.x;

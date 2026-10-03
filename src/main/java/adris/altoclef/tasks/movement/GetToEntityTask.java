@@ -5,7 +5,7 @@ import adris.altoclef.tasksystem.ITaskRequiresGrounded;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.baritone.GoalFollowEntity;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
-import net.minecraft.entity.Entity;
+import net.minecraft.world.entity.Entity;
 
 public class GetToEntityTask extends Task implements ITaskRequiresGrounded {
 
@@ -37,23 +37,27 @@ public class GetToEntityTask extends Task implements ITaskRequiresGrounded {
         if (_wanderTask.isActive() && !_wanderTask.isFinished(mod)) {
             _progress.reset();
             setDebugState("Failed to get to target, wandering for a bit.");
-            return _wanderTask;
+            return getRecoveryTask(mod);
         }
 
         if (!mod.getClientBaritone().getCustomGoalProcess().isActive()) {
             mod.getClientBaritone().getCustomGoalProcess().setGoalAndPath(new GoalFollowEntity(_entity, _closeEnoughDistance));
         }
 
-        if (mod.getPlayer().isInRange(_entity, _closeEnoughDistance)) {
+        if (mod.getPlayer().closerThan(_entity, _closeEnoughDistance)) {
             _progress.reset();
         }
 
         if (!_progress.check(mod)) {
-            return _wanderTask;
+            return getRecoveryTask(mod);
         }
 
         setDebugState("Going to entity");
         return null;
+    }
+
+    protected Task getRecoveryTask(AltoClef mod) {
+        return _wanderTask;
     }
 
     @Override
@@ -71,6 +75,6 @@ public class GetToEntityTask extends Task implements ITaskRequiresGrounded {
 
     @Override
     protected String toDebugString() {
-        return "Approach entity " + _entity.getType().getTranslationKey();
+        return "Approach entity " + _entity.getType().getDescriptionId();
     }
 }

@@ -1,17 +1,16 @@
 package adris.altoclef;
 
 import adris.altoclef.util.slots.Slot;
-import baritone.altoclef.AltoClefSettings;
+import adris.altoclef.baritone.AltoClefSettings;
 import baritone.api.Settings;
-import baritone.api.utils.RayTraceUtils;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.Entity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.Pair;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import adris.altoclef.util.Pair;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.ClipContext;
 
 import java.util.*;
 import java.util.function.BiFunction;
@@ -130,7 +129,20 @@ public class BotBehaviour {
         current().applyState();
     }
 
-    public void setRayTracingFluidHandling(RaycastContext.FluidHandling fluidHandling) {
+    /** Prevents a tool from being selected for matching blocks for this task scope. */
+    public void avoidUseTool(BiPredicate<BlockState, ItemStack> pred) {
+        current().avoidUseTools.add(pred);
+        current().applyState();
+    }
+
+    public boolean shouldAvoidUseTool(BlockState state, ItemStack tool) {
+        for (BiPredicate<BlockState, ItemStack> predicate : current().avoidUseTools) {
+            if (predicate.test(state, tool)) return true;
+        }
+        return false;
+    }
+
+    public void setRayTracingFluidHandling(ClipContext.Fluid fluidHandling) {
         current().rayFluidHandling = fluidHandling;
         //Debug.logMessage("OOF: " + fluidHandling);
         current().applyState();
@@ -274,6 +286,7 @@ public class BotBehaviour {
         public List<Predicate<BlockPos>> allowWalking = new ArrayList<>();
         public List<Predicate<BlockPos>> avoidWalkingThrough = new ArrayList<>();
         public List<BiPredicate<BlockState, ItemStack>> forceUseTools = new ArrayList<>();
+        public List<BiPredicate<BlockState, ItemStack>> avoidUseTools = new ArrayList<>();
         public List<BiFunction<Double, BlockPos, Double>> globalHeuristics = new ArrayList<>();
         public boolean _allowWalkThroughFlowingWater = false;
 
@@ -281,7 +294,7 @@ public class BotBehaviour {
         public boolean pauseOnLostFocus = true;
 
         // Hard coded stuff
-        public RaycastContext.FluidHandling rayFluidHandling;
+        public ClipContext.Fluid rayFluidHandling;
 
         // Other necessary stuff
         public boolean escapeLava = true;
@@ -306,6 +319,7 @@ public class BotBehaviour {
                 conversionSlots.addAll(toCopy.conversionSlots);
                 forceFieldPlayers = toCopy.forceFieldPlayers;
                 escapeLava = toCopy.escapeLava;
+                avoidUseTools = new ArrayList<>(toCopy.avoidUseTools);
             }
         }
 
@@ -340,6 +354,7 @@ public class BotBehaviour {
                         allowWalking = new ArrayList<>(settings.getForceWalkOnPredicates());
                         avoidWalkingThrough = new ArrayList<>(settings.getForceAvoidWalkThroughPredicates());
                         forceUseTools = new ArrayList<>(settings.getForceUseToolPredicates());
+                        avoidUseTools = new ArrayList<>(settings.getAvoidUseToolPredicates());
                     }
                 }
             }
@@ -348,11 +363,11 @@ public class BotBehaviour {
             }
             _allowWalkThroughFlowingWater = settings.isFlowingWaterPassAllowed();
 
-            rayFluidHandling = RayTraceUtils.fluidHandling;
+            rayFluidHandling = AltoClefSettings.getInstance().rayFluidHandling;
         }
 
         private void readMinecraftState() {
-            pauseOnLostFocus = MinecraftClient.getInstance().options.pauseOnLostFocus;
+            pauseOnLostFocus = Minecraft.getInstance().options.pauseOnLostFocus;
         }
 
         /**
@@ -386,6 +401,8 @@ public class BotBehaviour {
                         sa.getForceAvoidWalkThroughPredicates().addAll(avoidWalkingThrough);
                         sa.getForceUseToolPredicates().clear();
                         sa.getForceUseToolPredicates().addAll(forceUseTools);
+                        sa.getAvoidUseToolPredicates().clear();
+                        sa.getAvoidUseToolPredicates().addAll(avoidUseTools);
                     }
                 }
             }
@@ -399,10 +416,10 @@ public class BotBehaviour {
             sa.allowSwimThroughLava(swimThroughLava);
 
             // Extra / hard coded
-            RayTraceUtils.fluidHandling = rayFluidHandling;
+            AltoClefSettings.getInstance().rayFluidHandling = rayFluidHandling;
 
             // Minecraft
-            MinecraftClient.getInstance().options.pauseOnLostFocus = pauseOnLostFocus;
+            Minecraft.getInstance().options.pauseOnLostFocus = pauseOnLostFocus;
         }
     }
 }

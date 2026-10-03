@@ -1,5 +1,6 @@
 package adris.altoclef.util.helpers;
 
+import adris.altoclef.util.helpers.ItemCapabilities;
 import adris.altoclef.AltoClef;
 import adris.altoclef.Debug;
 import adris.altoclef.TaskCatalogue;
@@ -8,20 +9,30 @@ import adris.altoclef.tasks.CraftInInventoryTask;
 import adris.altoclef.util.*;
 import adris.altoclef.util.slots.*;
 import baritone.utils.ToolSet;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ChatScreen;
-import net.minecraft.client.gui.screen.GameMenuScreen;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.option.GameOptionsScreen;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.*;
-import net.minecraft.recipe.Recipe;
-import net.minecraft.screen.*;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.options.OptionsSubScreen;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.display.RecipeDisplayId;
+import net.minecraft.world.inventory.AbstractFurnaceMenu;
+import net.minecraft.world.inventory.BrewingStandMenu;
+import net.minecraft.world.inventory.CraftingMenu;
+import net.minecraft.world.inventory.FurnaceMenu;
+import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.inventory.ContainerData;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -34,21 +45,21 @@ public class StorageHelper {
     public static List<PlayerSlot> INACCESSIBLE_PLAYER_SLOTS = Stream.concat(Stream.of(PlayerSlot.CRAFT_INPUT_SLOTS), Stream.of(PlayerSlot.ARMOR_SLOTS)).toList();
 
     public static void closeScreen() {
-        if (MinecraftClient.getInstance().player == null)
+        if (Minecraft.getInstance().player == null)
             return;
-        Screen screen = MinecraftClient.getInstance().currentScreen;
+        Screen screen = Minecraft.getInstance().gui.screen();
         if (
                 screen != null &&
-                !(screen instanceof GameMenuScreen) &&
-                !(screen instanceof GameOptionsScreen) &&
+                !(screen instanceof PauseScreen) &&
+                !(screen instanceof OptionsSubScreen) &&
                 !(screen instanceof ChatScreen)) {
             // Close the screen if we're in-game
-            MinecraftClient.getInstance().player.closeHandledScreen();
+            Minecraft.getInstance().player.closeContainer();
         }
     }
 
     public static ItemStack getItemStackInSlot(Slot slot) {
-        ClientPlayerEntity player = MinecraftClient.getInstance().player;
+        LocalPlayer player = Minecraft.getInstance().player;
         if (player == null)
             return ItemStack.EMPTY;
         // Cursor slot
@@ -56,23 +67,23 @@ public class StorageHelper {
             return StorageHelper.getItemStackInCursorSlot();
         }
         // Inventory slot when inventory is NOT open
-        PlayerInventory inv = player.getInventory();
+        Inventory inv = player.getInventory();
         if (inv != null) {
             if (slot.equals(PlayerSlot.OFFHAND_SLOT))
-                return inv.offHand.stream().findFirst().orElse(ItemStack.EMPTY).copy();
+                return player.getOffhandItem().copy();
             if (slot.equals(PlayerSlot.ARMOR_HELMET_SLOT))
-                return inv.getArmorStack(3).copy();
+                return player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).copy();
             if (slot.equals(PlayerSlot.ARMOR_CHESTPLATE_SLOT))
-                return inv.getArmorStack(2).copy();
+                return player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).copy();
             if (slot.equals(PlayerSlot.ARMOR_LEGGINGS_SLOT))
-                return inv.getArmorStack(1).copy();
+                return player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.LEGS).copy();
             if (slot.equals(PlayerSlot.ARMOR_BOOTS_SLOT))
-                return inv.getArmorStack(0).copy();
+                return player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET).copy();
         }
         try {
             // We might have messed up and opened the wrong slot.
-            net.minecraft.screen.slot.Slot mcSlot = player.currentScreenHandler.getSlot(slot.getWindowSlot());
-            return (mcSlot != null) ? mcSlot.getStack().copy() : ItemStack.EMPTY;
+            net.minecraft.world.inventory.Slot mcSlot = player.containerMenu.getSlot(slot.getWindowSlot());
+            return (mcSlot != null) ? mcSlot.getItem().copy() : ItemStack.EMPTY;
         } catch (Exception e) {
             Debug.logWarning("Screen Slot Error (ignored)");
             e.printStackTrace();
@@ -98,21 +109,11 @@ public class StorageHelper {
         return mod.getItemStorage().hasItem(items);
     }
     private static boolean miningRequirementMetInner(AltoClef mod, boolean inventoryOnly, MiningRequirement requirement) {
-        switch (requirement) {
-            case HAND:
-                return true;
-            case WOOD:
-                return h(mod, inventoryOnly, Items.WOODEN_PICKAXE) || h(mod, inventoryOnly, Items.STONE_PICKAXE) || h(mod, inventoryOnly, Items.IRON_PICKAXE) || h(mod, inventoryOnly, Items.GOLDEN_PICKAXE) || h(mod, inventoryOnly, Items.DIAMOND_PICKAXE) || h(mod, inventoryOnly, Items.NETHERITE_PICKAXE);
-            case STONE:
-                return h(mod, inventoryOnly, Items.STONE_PICKAXE) || h(mod, inventoryOnly, Items.IRON_PICKAXE) || h(mod, inventoryOnly, Items.GOLDEN_PICKAXE) || h(mod, inventoryOnly, Items.DIAMOND_PICKAXE) || h(mod, inventoryOnly, Items.NETHERITE_PICKAXE);
-            case IRON:
-                return h(mod, inventoryOnly, Items.IRON_PICKAXE) || h(mod, inventoryOnly, Items.GOLDEN_PICKAXE) || h(mod, inventoryOnly, Items.DIAMOND_PICKAXE) || h(mod, inventoryOnly, Items.NETHERITE_PICKAXE);
-            case DIAMOND:
-                return h(mod, inventoryOnly, Items.DIAMOND_PICKAXE) || h(mod, inventoryOnly, Items.NETHERITE_PICKAXE);
-            default:
-                Debug.logError("You missed a spot");
-                return false;
+        if (requirement == MiningRequirement.HAND) return true;
+        for (Item item : net.minecraft.core.registries.BuiltInRegistries.ITEM) {
+            if (requirement.isSatisfiedBy(item) && h(mod, inventoryOnly, item)) return true;
         }
+        return false;
     }
     public static boolean miningRequirementMet(AltoClef mod, MiningRequirement requirement) {
         return miningRequirementMetInner(mod, false, requirement);
@@ -134,8 +135,11 @@ public class StorageHelper {
             if (!slot.isSlotInPlayerInventory())
                 continue;
             ItemStack stack = getItemStackInSlot(slot);
-            if (stack.getItem() instanceof ToolItem) {
-                if (stack.getItem().isSuitableFor(state)) {
+            if (mod.getBehaviour().shouldAvoidUseTool(state, stack)) {
+                continue;
+            }
+            if (ItemCapabilities.isTool(stack.getItem())) {
+                if (stack.isCorrectToolForDrops(state)) {
                     double speed = ToolSet.calculateSpeedVsBlock(stack, state);
                     if (speed > highestSpeed) {
                         highestSpeed = speed;
@@ -152,6 +156,48 @@ public class StorageHelper {
             }
         }
         return Optional.ofNullable(bestToolSlot);
+    }
+
+    /**
+     * Selects a safe hand slot if the currently held stack is forbidden for this block.
+     * Empty inventory slots are preferred so that breaking uses the player's bare hand.
+     */
+    public static Optional<Slot> getSafeHandSlot(AltoClef mod, BlockState state) {
+        Slot equipped = PlayerSlot.getEquipSlot();
+        if (!mod.getBehaviour().shouldAvoidUseTool(state, getItemStackInSlot(equipped))) {
+            return Optional.empty();
+        }
+
+        List<Slot> candidates = new ArrayList<>(36);
+        // Prefer an empty hotbar slot, then an empty inventory slot, then any safe stack.
+        for (int inventorySlot = 0; inventorySlot < 36; inventorySlot++) {
+            if (inventorySlot < 9) {
+                candidates.add(Slot.getFromCurrentScreenInventory(inventorySlot));
+            }
+        }
+        for (int inventorySlot = 9; inventorySlot < 36; inventorySlot++) {
+            candidates.add(Slot.getFromCurrentScreenInventory(inventorySlot));
+        }
+
+        return chooseSafeFallback(candidates, StorageHelper::getItemStackInSlot,
+                stack -> mod.getBehaviour().shouldAvoidUseTool(state, stack));
+    }
+
+    static <T> Optional<T> chooseSafeFallback(Iterable<T> candidates,
+                                               Function<T, ItemStack> getStack,
+                                               Predicate<ItemStack> shouldAvoid) {
+        T firstSafeStack = null;
+        for (T candidate : candidates) {
+            ItemStack stack = getStack.apply(candidate);
+            if (shouldAvoid.test(stack)) continue;
+            if (stack.isEmpty()) return Optional.of(candidate);
+            if (firstSafeStack == null) firstSafeStack = candidate;
+        }
+        return Optional.ofNullable(firstSafeStack);
+    }
+
+    public static boolean shouldReplaceEquippedTool(ItemStack current, ItemStack replacement) {
+        return !ItemStack.isSameItemSameComponents(current, replacement);
     }
 
     // Gets a slot with an item we can throw away
@@ -179,16 +225,16 @@ public class StorageHelper {
         }
 
         // Try throwing away lower tier tools
-        final HashMap<Class, Integer> bestMaterials = new HashMap<>();
-        final HashMap<Class, Slot> bestTool = new HashMap<>();
+        final HashMap<String, Integer> bestMaterials = new HashMap<>();
+        final HashMap<String, Slot> bestTool = new HashMap<>();
         for (Slot slot : PlayerSlot.getCurrentScreenSlots()) {
             ItemStack stack = StorageHelper.getItemStackInSlot(slot);
             if (!ItemHelper.canThrowAwayStack(mod, stack))
                 continue;
             Item item = stack.getItem();
-            if (item instanceof ToolItem tool) {
-                Class c = tool.getClass();
-                int level = tool.getMaterial().getMiningLevel();
+            if (ItemCapabilities.isTool(item)) {
+                String c = ItemCapabilities.toolKind(item);
+                int level = ItemCapabilities.miningLevel(item);
                 int prevBest = bestMaterials.getOrDefault(c, 0);
                 if (level > prevBest) {
                     // We had a WORSE tool before.
@@ -224,8 +270,8 @@ public class StorageHelper {
                 if (ItemHelper.canThrowAwayStack(mod, stack)) {
                     possibleSlots.add(slot);
                 }
-                if (stack.getItem().isFood()) {
-                    calcTotalFoodScore += Objects.requireNonNull(stack.getItem().getFoodComponent()).getHunger();
+                if (ItemCapabilities.isFood(stack.getItem())) {
+                    calcTotalFoodScore += Objects.requireNonNull(ItemCapabilities.food(stack.getItem())).nutrition();
                 }
             }
 
@@ -235,8 +281,8 @@ public class StorageHelper {
                 return possibleSlots.stream().min((leftSlot, rightSlot) -> {
                     ItemStack left = StorageHelper.getItemStackInSlot(leftSlot),
                             right = StorageHelper.getItemStackInSlot(rightSlot);
-                    boolean leftIsTool = left.getItem() instanceof ToolItem;
-                    boolean rightIsTool = right.getItem() instanceof ToolItem;
+                    boolean leftIsTool = ItemCapabilities.isTool(left.getItem());
+                    boolean rightIsTool = ItemCapabilities.isTool(right.getItem());
                     // Prioritize tools over materials.
                     if (rightIsTool && !leftIsTool) {
                         return -1;
@@ -245,19 +291,19 @@ public class StorageHelper {
                     }
                     if (rightIsTool && leftIsTool) {
                         // Prioritize material type, then durability.
-                        ToolItem leftTool = (ToolItem) left.getItem();
-                        ToolItem rightTool = (ToolItem) right.getItem();
-                        if (leftTool.getMaterial().getMiningLevel() != rightTool.getMaterial().getMiningLevel()) {
-                            return leftTool.getMaterial().getMiningLevel() - rightTool.getMaterial().getMiningLevel();
+                        Item leftTool = left.getItem();
+                        Item rightTool = right.getItem();
+                        if (ItemCapabilities.miningLevel(leftTool) != ItemCapabilities.miningLevel(rightTool)) {
+                            return ItemCapabilities.miningLevel(leftTool) - ItemCapabilities.miningLevel(rightTool);
                         }
                         // We want less damage.
-                        return left.getDamage() - right.getDamage();
+                        return left.getDamageValue() - right.getDamageValue();
                     }
 
                     // Prioritize food over other things if we lack food.
                     boolean lacksFood = totalFoodScore < 8;
-                    boolean leftIsFood = left.getItem().isFood() && left.getItem() != Items.SPIDER_EYE;
-                    boolean rightIsFood = right.getItem().isFood() && right.getItem() != Items.SPIDER_EYE;
+                    boolean leftIsFood = ItemCapabilities.isFood(left.getItem()) && left.getItem() != Items.SPIDER_EYE;
+                    boolean rightIsFood = ItemCapabilities.isFood(right.getItem()) && right.getItem() != Items.SPIDER_EYE;
                     if (lacksFood) {
                         if (rightIsFood && !leftIsFood) {
                             return -1;
@@ -267,10 +313,10 @@ public class StorageHelper {
                     }
                     // If both are food, pick the better cost.
                     if (leftIsFood && rightIsFood) {
-                        assert left.getItem().getFoodComponent() != null;
-                        assert right.getItem().getFoodComponent() != null;
-                        int leftCost = left.getItem().getFoodComponent().getHunger() * left.getCount(),
-                                rightCost = right.getItem().getFoodComponent().getHunger() * right.getCount();
+                        assert ItemCapabilities.food(left.getItem()) != null;
+                        assert ItemCapabilities.food(right.getItem()) != null;
+                        int leftCost = ItemCapabilities.food(left.getItem()).nutrition() * left.getCount(),
+                                rightCost = ItemCapabilities.food(right.getItem()).nutrition() * right.getCount();
                         return -1 * (leftCost - rightCost);
                     }
 
@@ -303,19 +349,54 @@ public class StorageHelper {
      * Same as {@code itemTargetsMetInventory} but it ignores the cursor slot.
      */
     public static boolean itemTargetsMetInventoryNoCursor(AltoClef mod, ItemTarget ...targetsToMeet) {
+        return itemTargetsMetAccessibleInventory(mod, targetsToMeet);
+    }
+
+    /**
+     * Checks whether each target is present in regular player inventory slots, excluding
+     * the cursor and the 2x2 player crafting grid.
+     */
+    public static boolean itemTargetsMetAccessibleInventory(AltoClef mod, ItemTarget ...targetsToMeet) {
+        return Arrays.stream(targetsToMeet).allMatch(target ->
+                getAccessibleInventoryItemCount(mod, target) >= target.getTargetCount());
+    }
+
+    /**
+     * Counts matching items that remain available in the player's ordinary inventory.
+     * Items on the cursor or in the 2x2 crafting grid are excluded because a resource
+     * goal must finish with its materials stored in accessible inventory slots.
+     */
+    public static int getAccessibleInventoryItemCount(AltoClef mod, ItemTarget target) {
+        int inventoryCount = mod.getItemStorage().getItemCountInventoryOnly(target.getMatches());
         ItemStack cursorStack = getItemStackInCursorSlot();
-        return Arrays.stream(targetsToMeet).allMatch(target -> {
-            int count = mod.getItemStorage().getItemCountInventoryOnly(target.getMatches());
-            if (target.matches(cursorStack.getItem()))
-                count -= cursorStack.getCount();
-            return count >= target.getTargetCount();
-        });
+        ItemStack[] craftingGrid = new ItemStack[0];
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player != null && player.containerMenu instanceof InventoryMenu) {
+            craftingGrid = Arrays.stream(PlayerSlot.CRAFT_INPUT_SLOTS)
+                    .map(StorageHelper::getItemStackInSlot)
+                    .toArray(ItemStack[]::new);
+        }
+        return getAccessibleInventoryItemCount(inventoryCount, target, cursorStack, craftingGrid);
+    }
+
+    static int getAccessibleInventoryItemCount(int inventoryCount, ItemTarget target,
+                                               ItemStack cursorStack, ItemStack... craftingGrid) {
+        int accessibleCount = inventoryCount;
+        if (target.matches(cursorStack.getItem())) {
+            accessibleCount -= cursorStack.getCount();
+        }
+        for (ItemStack stack : craftingGrid) {
+            if (stack != null && !stack.isEmpty() && target.matches(stack.getItem())) {
+                accessibleCount -= stack.getCount();
+            }
+        }
+        return Math.max(0, accessibleCount);
     }
 
     public static boolean isArmorEquipped(AltoClef mod, Item ...any) {
         for (Item item : any) {
-            if (item instanceof ArmorItem armor) {
-                ItemStack equippedStack = mod.getPlayer().getInventory().getArmorStack(armor.getSlotType().getEntitySlotId());
+            if (ItemCapabilities.isArmor(item)) {
+                ItemStack equippedStack = mod.getPlayer().getItemBySlot(ItemCapabilities.equipmentSlot(item));
                 if (equippedStack.getItem().equals(item))
                     return true;
             }
@@ -328,21 +409,21 @@ public class StorageHelper {
         return mod.getItemStorage().getItemCount(Arrays.stream(mod.getModSettings().getThrowawayItems(mod, true)).filter(item -> item instanceof BlockItem).toArray(Item[]::new));
     }
 
-    private static boolean isScreenOpenInner(Predicate<ScreenHandler> pNotNull) {
-        ClientPlayerEntity player = MinecraftClient.getInstance().player;
+    private static boolean isScreenOpenInner(Predicate<AbstractContainerMenu> pNotNull) {
+        LocalPlayer player = Minecraft.getInstance().player;
         if (player != null)
-            return pNotNull.test(player.currentScreenHandler);
+            return pNotNull.test(player.containerMenu);
         return false;
     }
 
     public static boolean isBigCraftingOpen() {
-        return isScreenOpenInner(screen -> screen instanceof CraftingScreenHandler);
+        return isScreenOpenInner(screen -> screen instanceof CraftingMenu);
     }
     public static boolean isPlayerInventoryOpen() {
-        return isScreenOpenInner(screen -> screen instanceof PlayerScreenHandler);
+        return isScreenOpenInner(screen -> screen instanceof InventoryMenu);
     }
     public static boolean isFurnaceOpen() {
-        return isScreenOpenInner(screen -> screen instanceof FurnaceScreenHandler);
+        return isScreenOpenInner(screen -> screen instanceof AbstractFurnaceMenu);
     }
 
     public static boolean isArmorEquippedAll(AltoClef mod, Item ...items) {
@@ -356,8 +437,8 @@ public class StorageHelper {
     public static int calculateInventoryFoodScore(AltoClef mod) {
         int result = 0;
         for (ItemStack stack : mod.getItemStorage().getItemStacksPlayerInventory(true)) {
-            if (stack.isFood())
-                result += Objects.requireNonNull(stack.getItem().getFoodComponent()).getHunger() * stack.getCount();
+            if (ItemCapabilities.isFood(stack.getItem()))
+                result += Objects.requireNonNull(ItemCapabilities.food(stack.getItem())).nutrition() * stack.getCount();
         }
         return result;
     }
@@ -398,10 +479,10 @@ public class StorageHelper {
                     List<Slot> slotsWithItem = mod.getItemStorage().getSlotsWithItemPlayerInventory(false, needs.getMatches());
 
                     // Other slots may have our crafting supplies.
-                    ScreenHandler screen = mod.getPlayer().currentScreenHandler;
-                    if (screen instanceof PlayerScreenHandler || screen instanceof CraftingScreenHandler) {
+                    AbstractContainerMenu screen = mod.getPlayer().containerMenu;
+                    if (screen instanceof InventoryMenu || screen instanceof CraftingMenu) {
                         // Check crafting slots
-                        boolean bigCrafting = (screen instanceof CraftingScreenHandler);
+                        boolean bigCrafting = (screen instanceof CraftingMenu);
                         boolean bigRecipe = recipe.isBig();
                         for (int craftSlotIndex = 0; craftSlotIndex < (bigCrafting ? 9 : 4); ++craftSlotIndex) {
                             Slot craftSlot = bigCrafting ? CraftingTableSlot.getInputSlot(craftSlotIndex, bigRecipe) : PlayerSlot.getCraftInputSlot(craftSlotIndex);
@@ -455,17 +536,24 @@ public class StorageHelper {
      */
     public static Optional<Slot> getFilledInventorySlotInaccessibleToContainer(AltoClef mod, ItemTarget withItem) {
         // First check if we have anything within our regular inventory.
-        if (!StorageHelper.isPlayerInventoryOpen() || withItem.isEmpty() || itemTargetsMetInventory(mod, withItem)) {
+        if (!StorageHelper.isPlayerInventoryOpen() || withItem.isEmpty()) {
             return Optional.empty();
         }
+        int accessibleCount = getAccessibleInventoryItemCount(mod, withItem);
+        if (accessibleCount >= withItem.getTargetCount()) return Optional.empty();
         // Then check our "invalid" slots for our item.
         for (Slot slot : INACCESSIBLE_PLAYER_SLOTS) {
-            if (withItem.matches(getItemStackInSlot(slot).getItem())) {
+            ItemStack stack = getItemStackInSlot(slot);
+            if (shouldMoveInaccessibleSlot(withItem.matches(stack.getItem()),
+                    isActiveConversionSlot(mod, slot, withItem))) {
                 return Optional.of(slot);
             }
         }
         // Consider Cursor slot only if we have our player inventory open AND we're not crafting it...
-        if (StorageHelper.isPlayerInventoryOpen() && withItem.matches(getItemStackInCursorSlot().getItem())) {
+        ItemStack cursorStack = getItemStackInCursorSlot();
+        if (StorageHelper.isPlayerInventoryOpen()
+                && shouldMoveInaccessibleSlot(withItem.matches(cursorStack.getItem()),
+                isActiveConversionSlot(mod, CursorSlot.SLOT, withItem))) {
             if (!mod.getUserTaskChain().getCurrentTask().thisOrChildSatisfies(task -> {
                 if (task instanceof CraftInInventoryTask invCraft) {
                     return withItem.matches(invCraft.getRecipeTarget().getOutputItem());
@@ -477,43 +565,58 @@ public class StorageHelper {
         }
         return Optional.empty();
     }
+
+    private static boolean isActiveConversionSlot(AltoClef mod, Slot slot, ItemTarget target) {
+        return mod.getBehaviour().getConversionSlots().stream().anyMatch(pair -> {
+            Slot conversionSlot = pair.getLeft();
+            if (!conversionSlot.equals(slot) || !conversionSlot.isScreenOpen()) return false;
+            ItemStack stack = getItemStackInSlot(conversionSlot);
+            return target.matches(stack.getItem()) && pair.getRight().test(stack);
+        });
+    }
+
+    static boolean shouldMoveInaccessibleSlot(boolean matchesTarget, boolean activeConversion) {
+        return matchesTarget && !activeConversion;
+    }
+
     public static boolean isItemInaccessibleToContainer(AltoClef mod, ItemTarget item) {
         return getFilledInventorySlotInaccessibleToContainer(mod, item).isPresent();
     }
 
     public static ItemStack getItemStackInCursorSlot() {
-        if (MinecraftClient.getInstance().player != null) {
-            if (MinecraftClient.getInstance().player.currentScreenHandler != null) {
-                return MinecraftClient.getInstance().player.currentScreenHandler.getCursorStack().copy();
+        if (Minecraft.getInstance().player != null) {
+            if (Minecraft.getInstance().player.containerMenu != null) {
+                return Minecraft.getInstance().player.containerMenu.getCarried().copy();
             }
         }
         return ItemStack.EMPTY;
     }
 
     public static int getBrewingStandFuel() {
-        if (MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().player.currentScreenHandler instanceof BrewingStandScreenHandler stand)
+        if (Minecraft.getInstance().player != null && Minecraft.getInstance().player.containerMenu instanceof BrewingStandMenu stand)
             return getBrewingStandFuel(stand);
         return -1;
     }
 
-    public static int getBrewingStandFuel(BrewingStandScreenHandler handler) {
+    public static int getBrewingStandFuel(BrewingStandMenu handler) {
         return handler.getFuel();
     }
 
-    public static double getFurnaceFuel(AbstractFurnaceScreenHandler handler) {
-        PropertyDelegate d = ((AbstractFurnaceScreenHandlerAccessor) handler).getPropertyDelegate();
+    public static double getFurnaceFuel(AbstractFurnaceMenu handler) {
+        ContainerData d = ((AbstractFurnaceScreenHandlerAccessor) handler).getPropertyDelegate();
         return (double) d.get(0) / 200.0;
     }
     public static double getFurnaceFuel() {
-        if (MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().player.currentScreenHandler instanceof AbstractFurnaceScreenHandler furnace)
+        if (Minecraft.getInstance().player != null && Minecraft.getInstance().player.containerMenu instanceof AbstractFurnaceMenu furnace)
             return getFurnaceFuel(furnace);
         return -1;
     }
-    public static double getFurnaceCookPercent(AbstractFurnaceScreenHandler handler) {
-        return (double) handler.getCookProgress() / 24.0;
+    public static double getFurnaceCookPercent(AbstractFurnaceMenu handler) {
+        // Modern getBurnProgress already returns cookTime / totalCookTime in [0, 1].
+        return handler.getBurnProgress();
     }
     public static double getFurnaceCookPercent() {
-        if (MinecraftClient.getInstance().player != null && MinecraftClient.getInstance().player.currentScreenHandler instanceof AbstractFurnaceScreenHandler furnace)
+        if (Minecraft.getInstance().player != null && Minecraft.getInstance().player.containerMenu instanceof AbstractFurnaceMenu furnace)
             return getFurnaceCookPercent(furnace);
         return -1;
     }
@@ -536,12 +639,13 @@ public class StorageHelper {
         return results;
     }
 
-    public static void instantFillRecipeViaBook(AltoClef mod, CraftingRecipe recipe, Item output, boolean craftAll) {
-        Optional<Recipe> recipeToSend = JankCraftingRecipeMapping.getMinecraftMappedRecipe(recipe, output);
+    public static boolean instantFillRecipeViaBook(AltoClef mod, CraftingRecipe recipe, Item output, boolean craftAll) {
+        Optional<RecipeDisplayId> recipeToSend = JankCraftingRecipeMapping.getMinecraftMappedRecipe(recipe, output);
         if (recipeToSend.isPresent()) {
-            mod.getController().clickRecipe(MinecraftClient.getInstance().player.currentScreenHandler.syncId, recipeToSend.get(), craftAll);
+            mod.getController().handlePlaceRecipe(Minecraft.getInstance().player.containerMenu.containerId, recipeToSend.get(), craftAll);
+            return true;
         } else {
-            Debug.logError("Could not find recipe stored in Minecraft!! Recipe: " + recipe + " with output " + output);
+            return false;
         }
     }
 }

@@ -5,10 +5,10 @@ import adris.altoclef.tasks.InteractWithBlockTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import baritone.api.utils.input.Input;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 
 /**
  * Given a block position with fire in it, extinguish the fire at that position
@@ -28,7 +28,7 @@ public class PutOutFireTask extends Task {
 
     @Override
     protected Task onTick(AltoClef mod) {
-        return new InteractWithBlockTask(ItemTarget.EMPTY, Direction.UP, _firePosition.down(), Input.CLICK_LEFT, false, false);
+        return new InteractWithBlockTask(ItemTarget.EMPTY, Direction.UP, _firePosition.below(), Input.CLICK_LEFT, false, false);
     }
 
     @Override

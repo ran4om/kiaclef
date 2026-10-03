@@ -6,8 +6,8 @@ import adris.altoclef.tasks.entity.DoToClosestEntityTask;
 import adris.altoclef.tasks.movement.GetToEntityTask;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.helpers.LookHelper;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.HashMap;
 
@@ -27,9 +27,9 @@ public class SCP173Task extends Task {
     private static final double LOOK_CLOSENESS_THRESHOLD = 0.2;
     private static final double HIT_RANGE = 2.5;
     private static final double WALK_THRESHOLD = 0.1;
-    private final HashMap<PlayerEntity, Double> _lastLookCloseness = new HashMap<>();
-    private PlayerEntity _lastTarget = null;
-    private Vec3d _lastWalkVelocity = Vec3d.ZERO;
+    private final HashMap<Player, Double> _lastLookCloseness = new HashMap<>();
+    private Player _lastTarget = null;
+    private Vec3 _lastWalkVelocity = Vec3.ZERO;
 
     @Override
     protected void onStart(AltoClef mod) {
@@ -42,8 +42,8 @@ public class SCP173Task extends Task {
         // FREEZE when nobody is looking.
         boolean seen = isSeenByPlayer(mod);
 
-        Vec3d currentVelocity = mod.getPlayer().getVelocity();
-        if (currentVelocity.lengthSquared() > WALK_THRESHOLD * WALK_THRESHOLD) {
+        Vec3 currentVelocity = mod.getPlayer().getDeltaMovement();
+        if (currentVelocity.lengthSqr() > WALK_THRESHOLD * WALK_THRESHOLD) {
             _lastWalkVelocity = currentVelocity;
         }
 
@@ -62,11 +62,11 @@ public class SCP173Task extends Task {
         }
 
         // Manually attack, since we ONLY attack when we can SEE the player.
-        if (_lastTarget != null && mod.getPlayer().isInRange(_lastTarget, HIT_RANGE)) {
+        if (_lastTarget != null && mod.getPlayer().closerThan(_lastTarget, HIT_RANGE)) {
             if (LookHelper.seesPlayer(mod.getPlayer(), _lastTarget, HIT_RANGE)) {
                 // Equip weapon
                 AbstractKillEntityTask.equipWeapon(mod);
-                if (mod.getPlayer().getAttackCooldownProgress(0) >= 0.99) {
+                if (mod.getPlayer().getAttackStrengthScale(0) >= 0.99) {
                     mod.getControllerExtras().attack(_lastTarget);
                 }
             }
@@ -74,10 +74,10 @@ public class SCP173Task extends Task {
 
         return new DoToClosestEntityTask(
             target -> {
-                _lastTarget = (PlayerEntity) target;
+                _lastTarget = (Player) target;
                 return new GetToEntityTask(target);
             },
-            PlayerEntity.class
+            Player.class
         );
     }
 
@@ -97,8 +97,8 @@ public class SCP173Task extends Task {
     }
 
     private boolean isSeenByPlayer(AltoClef mod) {
-        if (mod.getEntityTracker().entityFound(PlayerEntity.class)) {
-            for (PlayerEntity player : mod.getEntityTracker().getTrackedEntities(PlayerEntity.class)) {
+        if (mod.getEntityTracker().entityFound(Player.class)) {
+            for (Player player : mod.getEntityTracker().getTrackedEntities(Player.class)) {
                 // Player must be NOT looking in our general direction OR NOT have line of sight.
                 if (entityIsLookingInOurGeneralDirection(mod, player) && entityHasLineOfSightToUs(mod, player)) {
                     return true;
@@ -113,8 +113,8 @@ public class SCP173Task extends Task {
     // We consider if the player is looking in the general direction
     // but we ALSO consider when the player is ALMOST looking in the general direction and
     // is ROTATING TORWARDS US to try and mitigate the look delay.
-    private boolean entityIsLookingInOurGeneralDirection(AltoClef mod, PlayerEntity other) {
-        double lookCloseness = LookHelper.getLookCloseness(other, mod.getPlayer().getPos());
+    private boolean entityIsLookingInOurGeneralDirection(AltoClef mod, Player other) {
+        double lookCloseness = LookHelper.getLookCloseness(other, mod.getPlayer().position());
         double last = _lastLookCloseness.getOrDefault(other, lookCloseness);
         double delta = lookCloseness - last;
         double predicted = lookCloseness + delta * 6;
@@ -122,21 +122,21 @@ public class SCP173Task extends Task {
         return lookCloseness > LOOK_CLOSENESS_THRESHOLD || predicted > LOOK_CLOSENESS_THRESHOLD;
     }
 
-    private boolean entityHasLineOfSightToUs(AltoClef mod, PlayerEntity other) {
+    private boolean entityHasLineOfSightToUs(AltoClef mod, Player other) {
         if (LookHelper.seesPlayer(mod.getPlayer(), other, MAX_RANGE)) {
             return true;
         }
         // Check if we're about to be visible or if the PLAYER is about to be visible.
         double playerVelMul = 5;
         double entityVelMul = 10;
-        Vec3d lastVelocityOffs = _lastWalkVelocity.multiply(playerVelMul);
-        if (!_lastWalkVelocity.equals(Vec3d.ZERO)) {
+        Vec3 lastVelocityOffs = _lastWalkVelocity.scale(playerVelMul);
+        if (!_lastWalkVelocity.equals(Vec3.ZERO)) {
             double minLength = 1.3;
-            if (lastVelocityOffs.lengthSquared() < minLength * minLength) {
-                lastVelocityOffs = lastVelocityOffs.normalize().multiply(minLength);
+            if (lastVelocityOffs.lengthSqr() < minLength * minLength) {
+                lastVelocityOffs = lastVelocityOffs.normalize().scale(minLength);
             }
         }
-        return LookHelper.seesPlayer(mod.getPlayer(), other, MAX_RANGE, mod.getPlayer().getVelocity().multiply(playerVelMul), other.getVelocity().multiply(entityVelMul))
-                || LookHelper.seesPlayer(mod.getPlayer(), other, MAX_RANGE, lastVelocityOffs, Vec3d.ZERO);
+        return LookHelper.seesPlayer(mod.getPlayer(), other, MAX_RANGE, mod.getPlayer().getDeltaMovement().scale(playerVelMul), other.getDeltaMovement().scale(entityVelMul))
+                || LookHelper.seesPlayer(mod.getPlayer(), other, MAX_RANGE, lastVelocityOffs, Vec3.ZERO);
     }
 }

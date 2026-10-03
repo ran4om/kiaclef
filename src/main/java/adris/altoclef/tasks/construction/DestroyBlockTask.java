@@ -11,13 +11,14 @@ import adris.altoclef.util.time.TimerGame;
 import adris.altoclef.util.helpers.LookHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.helpers.WorldHelper;
+import adris.altoclef.util.slots.PlayerSlot;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import baritone.api.pathing.goals.GoalBlock;
 import baritone.api.pathing.goals.GoalNear;
 import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
-import net.minecraft.block.Blocks;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.core.BlockPos;
 
 import java.util.Optional;
 
@@ -27,6 +28,7 @@ import java.util.Optional;
 public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
 
     private final BlockPos _pos;
+    private final boolean _directOnly;
     private final MovementProgressChecker _moveChecker = new MovementProgressChecker(6, 0.1, 4, 0.01);
     private final TimeoutWanderTask _wanderTask = new TimeoutWanderTask(5, true);
 
@@ -36,7 +38,16 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
     private boolean _wasClose = false;
 
     public DestroyBlockTask(BlockPos pos) {
+        this(pos, false);
+    }
+
+    /**
+     * @param directOnly refuse all travel and builder fallback; mine only while grounded
+     *                   and in direct interaction reach
+     */
+    public DestroyBlockTask(BlockPos pos, boolean directOnly) {
         _pos = pos;
+        _directOnly = directOnly;
     }
 
     @Override
@@ -47,43 +58,73 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
 
         mod.getBehaviour().push();
         // Avoid placing on top, to prevent our annoying "run away" bug
-        mod.getBehaviour().avoidBlockPlacing(pos -> _pos.up().equals(pos));
+        mod.getBehaviour().avoidBlockPlacing(pos -> _pos.above().equals(pos));
     }
 
     @Override
     protected Task onTick(AltoClef mod) {
+        Optional<Rotation> directReach = _directOnly ? LookHelper.getReach(_pos) : Optional.empty();
+        if (_directOnly) {
+            if (!canDirectlyBreak(mod.getPlayer().onGround(), directReach.isPresent())) {
+                mod.getClientBaritone().getInputOverrideHandler()
+                        .setInputForceState(Input.CLICK_LEFT, false);
+                setDebugState("Waiting for grounded direct reach; no travel or builder fallback allowed.");
+                return null;
+            }
+        }
 
         // Wander and check
         if (_wanderTask.isActive() && !_wanderTask.isFinished(mod)) {
             _moveChecker.reset();
-            return _wanderTask;
+            return getRecoveryWanderTask(mod, _pos);
         }
         if (!_moveChecker.check(mod)) {
             _moveChecker.reset();
-            mod.getBlockTracker().requestBlockUnreachable(_pos);
             _wanderTask.resetWander();
-            return _wanderTask;
+            Task recoveryTask = getRecoveryWanderTask(mod, _pos);
+            if (recoveryTask == null) {
+                // A caller that disables recovery travel wants another target selected.
+                mod.getBlockTracker().requestBlockUnreachable(_pos, 0);
+                return null;
+            }
+            mod.getBlockTracker().requestBlockUnreachable(_pos);
+            return recoveryTask;
         }
 
         // do NOT break if we're standing above it and it's dangerous below...
-        if (!WorldHelper.isSolid(mod, _pos.up()) && mod.getPlayer().getPos().y > _pos.getY() && _pos.isWithinDistance(mod.getPlayer().isOnGround()? mod.getPlayer().getPos() : mod.getPlayer().getPos().add(0, -1, 0), 0.89)) {
+        if (!WorldHelper.isSolid(mod, _pos.above()) && mod.getPlayer().position().y > _pos.getY() && _pos.closerToCenterThan(mod.getPlayer().onGround()? mod.getPlayer().position() : mod.getPlayer().position().add(0, -1, 0), 0.89)) {
             if (WorldHelper.dangerousToBreakIfRightAbove(mod, _pos)) {
                 setDebugState("It's dangerous to break as we're right above it, moving away and trying again.");
-                return new RunAwayFromPositionTask(3, _pos.getY(), _pos);
+                Task recoveryTask = getDangerousBreakRecoveryTask(mod, _pos);
+                if (recoveryTask == null) {
+                    // Do not keep selecting a target whose required safety recovery is unavailable.
+                    mod.getBlockTracker().requestBlockUnreachable(_pos, 0);
+                }
+                return recoveryTask;
             }
         }
 
         // We're trying to mine
-        Optional<Rotation> reach = LookHelper.getReach(_pos);
+        Optional<Rotation> reach = _directOnly ? directReach : LookHelper.getReach(_pos);
         if (reach.isPresent()) {
             _tryToMineTimer.reset();
         }
         if (!_tryToMineTimer.elapsed()) {
-            if (reach.isPresent() && (mod.getPlayer().isTouchingWater() || mod.getPlayer().isOnGround())) {
+            if (reach.isPresent() && (mod.getPlayer().isInWater() || mod.getPlayer().onGround())) {
                 setDebugState("Block in range, mining...");
                 // Break the block, force it.
                 mod.getClientBaritone().getCustomGoalProcess().onLostControl();
                 mod.getClientBaritone().getBuilderProcess().onLostControl();
+                var blockState = mod.getWorld().getBlockState(_pos);
+                var heldStack = StorageHelper.getItemStackInSlot(PlayerSlot.getEquipSlot());
+                if (mod.getBehaviour().shouldAvoidUseTool(blockState, heldStack)) {
+                    StorageHelper.getSafeHandSlot(mod, blockState)
+                            .ifPresent(mod.getSlotHandler()::forceEquipSlot);
+                    mod.getClientBaritone().getInputOverrideHandler()
+                            .setInputForceState(Input.CLICK_LEFT, false);
+                    setDebugState("Waiting for a tool that preserves this block's drop");
+                    return null;
+                }
                 if (!LookHelper.isLookingAt(mod, _pos)) {
                     LookHelper.lookAt(mod, reach.get());
                 }
@@ -102,7 +143,7 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
             }
         } else {
             setDebugState("Getting to block...");
-            boolean isClose = _pos.isWithinDistance(mod.getPlayer().getPos(), 1);
+            boolean isClose = _pos.closerToCenterThan(mod.getPlayer().position(), 1);
             if (isClose != _wasClose) {
                 mod.getClientBaritone().getCustomGoalProcess().onLostControl();
                 _wasClose = isClose;
@@ -115,6 +156,22 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
         }
 
         return null;
+    }
+
+    /** Returns the movement task used when pathing to this block appears stuck. */
+    protected Task getRecoveryWanderTask(AltoClef mod, BlockPos pos) {
+        if (_directOnly) return null;
+        return _wanderTask;
+    }
+
+    /** Returns the movement task used to retreat before breaking a dangerous block. */
+    protected Task getDangerousBreakRecoveryTask(AltoClef mod, BlockPos pos) {
+        if (_directOnly) return null;
+        return new RunAwayFromPositionTask(3, pos.getY(), pos);
+    }
+
+    static boolean canDirectlyBreak(boolean onGround, boolean hasLookReach) {
+        return onGround && hasLookReach;
     }
 
     @Override
@@ -137,7 +194,7 @@ public class DestroyBlockTask extends Task implements ITaskRequiresGrounded {
     @Override
     protected boolean isEqual(Task other) {
         if (other instanceof DestroyBlockTask task) {
-            return task._pos.equals(_pos);
+            return task._pos.equals(_pos) && task._directOnly == _directOnly;
         }
         return false;
     }

@@ -12,14 +12,14 @@ import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.Slot;
 import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ChatScreen;
-import net.minecraft.client.gui.screen.DeathScreen;
-import net.minecraft.client.gui.screen.GameMenuScreen;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.gui.screens.DeathScreen;
+import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.inventory.ContainerInput;
 
 import java.util.Optional;
 
@@ -58,6 +58,23 @@ public class PlayerInteractionFixChain extends TaskChain {
 
         if (!AltoClef.inGame()) return Float.NEGATIVE_INFINITY;
 
+        // Safety exclusions take effect immediately, before the current user task can
+        // issue another direct attack input. The normal best-tool scan remains throttled.
+        if (mod.getUserTaskChain().isActive() && mod.getControllerExtras().isBreakingBlock()) {
+            BlockState state = mod.getWorld().getBlockState(mod.getControllerExtras().getBreakingBlockPos());
+            Slot currentEquipped = PlayerSlot.getEquipSlot();
+            ItemStack currentStack = StorageHelper.getItemStackInSlot(currentEquipped);
+            if (mod.getBehaviour().shouldAvoidUseTool(state, currentStack)) {
+                StorageHelper.getSafeHandSlot(mod, state).ifPresent(safeSlot -> {
+                    ItemStack safeStack = StorageHelper.getItemStackInSlot(safeSlot);
+                    if (!safeSlot.equals(currentEquipped)
+                            && StorageHelper.shouldReplaceEquippedTool(currentStack, safeStack)) {
+                        mod.getSlotHandler().forceEquipSlot(safeSlot);
+                    }
+                });
+            }
+        }
+
         if (mod.getUserTaskChain().isActive() && _betterToolTimer.elapsed()) {
             // Equip the right tool for the job if we're not using one.
             _betterToolTimer.reset();
@@ -70,7 +87,8 @@ public class PlayerInteractionFixChain extends TaskChain {
                 // Baritone will take care of tools inside the hotbar.
                 if (bestToolSlot.isPresent() && !bestToolSlot.get().equals(currentEquipped)) {
                     // ONLY equip if the item class is STRICTLY different (otherwise we swap around a lot)
-                    if (StorageHelper.getItemStackInSlot(currentEquipped).getItem() != StorageHelper.getItemStackInSlot(bestToolSlot.get()).getItem()) {
+                    if (StorageHelper.shouldReplaceEquippedTool(StorageHelper.getItemStackInSlot(currentEquipped),
+                            StorageHelper.getItemStackInSlot(bestToolSlot.get()))) {
                         boolean isAllowedToManage = !mod.getClientBaritone().getPathingBehavior().isPathing() || bestToolSlot.get().getInventorySlot() >= 9;
                         if (isAllowedToManage) {
                             Debug.logMessage("Found better tool in inventory, equipping.");
@@ -105,7 +123,7 @@ public class PlayerInteractionFixChain extends TaskChain {
 
         if (currentStack != null && !currentStack.isEmpty()) {
             //noinspection PointlessNullCheck
-            if (_lastHandStack == null || !ItemStack.areEqual(currentStack, _lastHandStack)) {
+            if (_lastHandStack == null || !ItemStack.matches(currentStack, _lastHandStack)) {
                 // We're holding a new item in our stack!
                 _stackHeldTimeout.reset();
                 _lastHandStack = currentStack.copy();
@@ -120,11 +138,11 @@ public class PlayerInteractionFixChain extends TaskChain {
             Debug.logMessage("Cursor stack is held for too long, will move back to inventory.");
             Optional<Slot> moveTo = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(_lastHandStack, false).or(() -> StorageHelper.getGarbageSlot(mod));
             if (moveTo.isPresent()) {
-                mod.getSlotHandler().clickSlot(moveTo.get(), 0, SlotActionType.PICKUP);
+                mod.getSlotHandler().clickSlot(moveTo.get(), 0, ContainerInput.PICKUP);
             } else {
                 // Try throwing away cursor slot if it's garbage
                 if (ItemHelper.canThrowAwayStack(mod, StorageHelper.getItemStackInCursorSlot())) {
-                    mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, SlotActionType.PICKUP);
+                    mod.getSlotHandler().clickSlot(Slot.UNDEFINED, 0, ContainerInput.PICKUP);
                 } else {
                     Debug.logMessage("Cursor stack edge case: Full inventory AND NO GARBAGE! We're stuck.");
                 }
@@ -145,12 +163,12 @@ public class PlayerInteractionFixChain extends TaskChain {
         if (!mod.getModSettings().shouldCloseScreenWhenLookingOrMining())
             return false;
         // Only check look if we've had the same screen open for a while
-        Screen openScreen = MinecraftClient.getInstance().currentScreen;
+        Screen openScreen = Minecraft.getInstance().gui.screen();
         if (openScreen != _lastScreen) {
             _mouseMovingButScreenOpenTimeout.reset();
         }
         // We're in the player screen/a screen we DON'T want to cancel out of
-        if (openScreen == null || openScreen instanceof ChatScreen || openScreen instanceof GameMenuScreen || openScreen instanceof DeathScreen) {
+        if (openScreen == null || openScreen instanceof ChatScreen || openScreen instanceof PauseScreen || openScreen instanceof DeathScreen) {
             _mouseMovingButScreenOpenTimeout.reset();
             return false;
         }

@@ -3,8 +3,8 @@ package adris.altoclef.tasks.container;
 import adris.altoclef.AltoClef;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import org.apache.commons.lang3.NotImplementedException;
 
 public class CraftInAnvilTask extends DoStuffInContainerTask {

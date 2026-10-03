@@ -5,7 +5,7 @@ import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.MiningRequirement;
 import adris.altoclef.util.helpers.StorageHelper;
-import net.minecraft.item.Item;
+import net.minecraft.world.item.Item;
 
 public class GetBuildingMaterialsTask extends Task {
     private final int _count;

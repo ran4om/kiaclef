@@ -5,6 +5,7 @@ import adris.altoclef.Debug;
 import adris.altoclef.eventbus.EventBus;
 import adris.altoclef.eventbus.events.TaskFinishedEvent;
 import adris.altoclef.tasksystem.Task;
+import adris.altoclef.tasksystem.TaskFailure;
 import adris.altoclef.tasksystem.TaskRunner;
 import adris.altoclef.util.time.Stopwatch;
 
@@ -13,11 +14,17 @@ import adris.altoclef.util.time.Stopwatch;
 @SuppressWarnings("ALL")
 public class UserTaskChain extends SingleTaskChain {
 
+    /** Stable outcome of the most recently completed user task. */
+    public record CompletionSnapshot(Task task, double durationSeconds,
+                                     TaskFailure.Snapshot failure, boolean cancelled) {
+    }
+
     private final Stopwatch _taskStopwatch = new Stopwatch();
     private Runnable _currentOnFinish = null;
 
     private boolean _runningIdleTask;
     private boolean _nextTaskIdleFlag;
+    private CompletionSnapshot _lastCompletion;
 
     public UserTaskChain(TaskRunner runner) {
         super(runner);
@@ -55,9 +62,8 @@ public class UserTaskChain extends SingleTaskChain {
     }
 
     public void cancel(AltoClef mod) {
-        if (_mainTask != null && _mainTask.isActive()) {
-            stop(mod);
-            onTaskFinish(mod);
+        if (_mainTask != null) {
+            finishTask(mod, _mainTask, null, true);
         }
     }
 
@@ -92,27 +98,59 @@ public class UserTaskChain extends SingleTaskChain {
 
     @Override
     protected void onTaskFinish(AltoClef mod) {
+        Task oldTask = _mainTask;
+        TaskFailure.Snapshot failure = oldTask == null ? null : oldTask.getFailureSnapshot();
+        finishTask(mod, oldTask, failure, false);
+    }
+
+    @Override
+    protected void onTaskFinish(AltoClef mod, TaskFailure.Snapshot failure, boolean cancelled) {
+        finishTask(mod, _mainTask, failure, cancelled);
+    }
+
+    private void finishTask(AltoClef mod, Task oldTask, TaskFailure.Snapshot failure, boolean cancelled) {
+        Runnable onFinish = _currentOnFinish;
+        boolean oldTaskWasIdle = _runningIdleTask;
+        _mainTask = null;
+        _currentOnFinish = null;
+
+        // A finished task is still active until it is explicitly stopped. Run its
+        // cleanup before invoking user callbacks or starting the idle command.
+        if (oldTask != null) {
+            oldTask.stop(mod);
+        }
+
+        double seconds = _taskStopwatch.time();
+        _lastCompletion = new CompletionSnapshot(oldTask, seconds, failure, cancelled);
+
         boolean shouldIdle = mod.getModSettings().shouldRunIdleCommandWhenNotActive();
         if (!shouldIdle) {
             // Stop.
             mod.getTaskRunner().disable();
             // Extra reset. Sometimes baritone is laggy and doesn't properly reset our press
-            mod.getClientBaritone().getInputOverrideHandler().clearAllKeys();
+            clearAllInputKeys(mod);
         }
-        double seconds = _taskStopwatch.time();
-        Task oldTask = _mainTask;
-        _mainTask = null;
-        if (_currentOnFinish != null) {
+        if (onFinish != null) {
             //noinspection unchecked
-            _currentOnFinish.run();
+            onFinish.run();
         }
-        // our `onFinish` might have triggered more tasks.
-        boolean actuallyDone = _mainTask == null;
-        if (actuallyDone) {
-            if (!_runningIdleTask) {
+        // A callback may already have scheduled the next task. The old task's
+        // outcome still needs to be reported; only idle dispatch depends on the
+        // chain remaining empty.
+        if (!oldTaskWasIdle) {
+            if (failure != null) {
+                String reason = failure.reason();
+                Debug.logError("User task FAILED%s. Took %s seconds.",
+                        reason == null || reason.isBlank() ? "" : ": " + reason,
+                        prettyPrintTimeDuration(seconds));
+            } else if (cancelled) {
+                Debug.logMessage("User task cancelled. Took %s seconds.", prettyPrintTimeDuration(seconds));
+            } else {
                 Debug.logMessage("User task FINISHED. Took %s seconds.", prettyPrintTimeDuration(seconds));
-                EventBus.publish(new TaskFinishedEvent(seconds, oldTask));
             }
+            EventBus.publish(new TaskFinishedEvent(seconds, oldTask, failure, cancelled));
+        }
+        if (_mainTask == null) {
             if (shouldIdle) {
                 AltoClef.getCommandExecutor().executeWithPrefix(mod.getModSettings().getIdleCommand());
                 signalNextTaskToBeIdleTask();
@@ -121,8 +159,17 @@ public class UserTaskChain extends SingleTaskChain {
         }
     }
 
+    protected void clearAllInputKeys(AltoClef mod) {
+        mod.getClientBaritone().getInputOverrideHandler().clearAllKeys();
+    }
+
     public boolean isRunningIdleTask() {
         return isActive() && _runningIdleTask;
+    }
+
+    /** Returns the stable outcome recorded before the completion callback ran. */
+    public CompletionSnapshot getLastCompletionSnapshot() {
+        return _lastCompletion;
     }
 
     // The next task will be an idle task.

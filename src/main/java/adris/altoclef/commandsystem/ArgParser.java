@@ -78,7 +78,9 @@ public class ArgParser {
             throw new CommandException("You tried grabbing more arguments than you had... Bad move.");
         }
         ArgBase arg = _args[argCounter];
-        if (!arg.isArbitrarilyLong() && argUnits.length > _args.length) {
+        boolean hasTrailingArbitraryArgument = _args.length > 0
+                && _args[_args.length - 1].isArbitrarilyLong();
+        if (!hasTrailingArbitraryArgument && argUnits.length > _args.length) {
             throw new CommandException(String.format("Too many arguments provided %d. The maximum is %d.", argUnits.length, _args.length));
         }
 

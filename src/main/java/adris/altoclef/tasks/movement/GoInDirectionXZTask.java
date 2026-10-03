@@ -5,22 +5,22 @@ import adris.altoclef.Debug;
 import adris.altoclef.tasksystem.Task;
 import adris.altoclef.util.baritone.GoalDirectionXZ;
 import baritone.api.pathing.goals.Goal;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.phys.Vec3;
 
 public class GoInDirectionXZTask extends CustomBaritoneGoalTask {
 
-    private final Vec3d _origin;
-    private final Vec3d _delta;
+    private final Vec3 _origin;
+    private final Vec3 _delta;
     private final double _sidePenalty;
 
-    public GoInDirectionXZTask(Vec3d origin, Vec3d delta, double sidePenalty) {
+    public GoInDirectionXZTask(Vec3 origin, Vec3 delta, double sidePenalty) {
         _origin = origin;
         _delta = delta;
         _sidePenalty = sidePenalty;
     }
 
-    private static boolean closeEnough(Vec3d a, Vec3d b) {
-        return a.squaredDistanceTo(b) < 0.001;
+    private static boolean closeEnough(Vec3 a, Vec3 b) {
+        return a.distanceToSqr(b) < 0.001;
     }
 
     @Override

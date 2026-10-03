@@ -9,10 +9,10 @@ import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.progresscheck.MovementProgressChecker;
 import baritone.api.pathing.goals.Goal;
 import baritone.api.pathing.goals.GoalRunAway;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -25,9 +25,9 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
     private static final HashSet<Block> ANNOYING_STUCK_BLOCKS;
     static {
         ANNOYING_STUCK_BLOCKS = new HashSet<>();
-        ANNOYING_STUCK_BLOCKS.addAll(Arrays.stream(ItemHelper.WOOD_FENCE).map(Block::getBlockFromItem).toList());
-        //ANNOYING_STUCK_BLOCKS.addAll(Arrays.stream(ItemHelper.WOOD_DOOR).map(Block::getBlockFromItem).toList());
-        ANNOYING_STUCK_BLOCKS.addAll(Arrays.stream(ItemHelper.FLOWER).map(Block::getBlockFromItem).toList());
+        ANNOYING_STUCK_BLOCKS.addAll(Arrays.stream(ItemHelper.WOOD_FENCE).map(Block::byItem).toList());
+        //ANNOYING_STUCK_BLOCKS.addAll(Arrays.stream(ItemHelper.WOOD_DOOR).map(Block::byItem).toList());
+        ANNOYING_STUCK_BLOCKS.addAll(Arrays.stream(ItemHelper.FLOWER).map(Block::byItem).toList());
         ANNOYING_STUCK_BLOCKS.addAll(Arrays.asList(Blocks.VINE,
                 Blocks.NETHER_SPROUTS,
                 Blocks.CAVE_VINES,
@@ -41,7 +41,7 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
                 Blocks.SMALL_DRIPLEAF,
                 Blocks.TALL_GRASS,
                 Blocks.SNOW,
-                Blocks.GRASS
+                Blocks.SHORT_GRASS
         ));
     }
 
@@ -50,7 +50,7 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
     private final boolean _increaseRange;
     //private DistanceProgressChecker _distanceProgressChecker = new DistanceProgressChecker(10, 0.1f);
 
-    private Vec3d _origin;
+    private Vec3 _origin;
     private boolean _executingPlanB = false;
     private boolean _forceExplore;
     private Task _unstuckTask = null;
@@ -78,10 +78,10 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
 
     private static BlockPos[] generateSides(BlockPos pos) {
         return new BlockPos[]{
-                pos.add(1, 0, 0),
-                pos.add(-1, 0, 0),
-                pos.add(0, 0, 1),
-                pos.add(0, 0, -1),
+                pos.offset(1, 0, 0),
+                pos.offset(-1, 0, 0),
+                pos.offset(0, 0, 1),
+                pos.offset(0, 0, -1),
         };
     }
 
@@ -92,7 +92,7 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
 
     @Override
     protected void onStart(AltoClef mod) {
-        _origin = mod.getPlayer().getPos();
+        _origin = mod.getPlayer().position();
         _progressChecker.reset();
         _failCounter = 0;
         StorageHelper.closeScreen();
@@ -117,7 +117,7 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
         } else {
             setDebugState("Exploring.");
             if (!mod.getClientBaritone().getExploreProcess().isActive()) {
-                mod.getClientBaritone().getExploreProcess().explore((int) _origin.getX(), (int) _origin.getZ());
+                mod.getClientBaritone().getExploreProcess().explore((int) _origin.x, (int) _origin.z);
             }
         }
 
@@ -152,7 +152,7 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
 
     private Goal getRandomDirectionGoal(AltoClef mod) {
         double distance = Float.isInfinite(_distanceToWander) ? _distanceToWander : _distanceToWander + _wanderDistanceExtension;
-        return new GoalRunAway(distance, mod.getPlayer().getBlockPos());
+        return new GoalRunAway(distance, mod.getPlayer().blockPosition());
     }
 
     @Override
@@ -179,8 +179,8 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
             return true;
         }
 
-        if (mod.getPlayer() != null && mod.getPlayer().getPos() != null) {
-            double sqDist = mod.getPlayer().getPos().squaredDistanceTo(_origin);
+        if (mod.getPlayer() != null && mod.getPlayer().position() != null) {
+            double sqDist = mod.getPlayer().position().distanceToSqr(_origin);
             double toWander = _distanceToWander + _wanderDistanceExtension;
             return sqDist > toWander * toWander;
         } else {
@@ -206,16 +206,16 @@ public class TimeoutWanderTask extends Task implements ITaskRequiresGrounded {
 
     // This happens all the time in mineshafts and swamps/jungles
     private BlockPos stuckInBlock(AltoClef mod) {
-        BlockPos p = mod.getPlayer().getBlockPos();
+        BlockPos p = mod.getPlayer().blockPosition();
         if (isAnnoying(mod, p)) return p;
-        if (isAnnoying(mod, p.up())) return p.up();
+        if (isAnnoying(mod, p.above())) return p.above();
         BlockPos[] toCheck = generateSides(p);
         for (BlockPos check : toCheck) {
             if (isAnnoying(mod, check)) {
                 return check;
             }
         }
-        BlockPos[] toCheckHigh = generateSides(p.up());
+        BlockPos[] toCheckHigh = generateSides(p.above());
         for (BlockPos check : toCheckHigh) {
             if (isAnnoying(mod, check)) {
                 return check;

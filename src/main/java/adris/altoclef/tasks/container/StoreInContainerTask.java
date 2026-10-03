@@ -8,8 +8,11 @@ import adris.altoclef.trackers.storage.ContainerCache;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.Slot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.BlockPos;
 
 import java.util.Arrays;
 import java.util.List;
@@ -25,6 +28,8 @@ public class StoreInContainerTask extends AbstractDoToStorageContainerTask {
     private final ItemTarget[] _toStore;
 
     private ContainerStoredTracker _storedItems;
+    private Task _activeTransferTask;
+    private AbstractContainerMenu _activeTransferMenu;
 
     public StoreInContainerTask(BlockPos targetContainer, boolean getIfNotPresent, ItemTarget ...toStore) {
         _targetContainer = targetContainer;
@@ -40,11 +45,14 @@ public class StoreInContainerTask extends AbstractDoToStorageContainerTask {
     @Override
     protected void onStart(AltoClef mod) {
         super.onStart(mod);
+        _activeTransferTask = null;
+        _activeTransferMenu = null;
         if (_storedItems == null) {
             // Only consider transfers to the container we wish
             _storedItems = new ContainerStoredTracker(slot -> {
-                Optional<BlockPos> openContainer = mod.getItemStorage().getLastBlockPosInteraction();
-                return openContainer.isPresent() && openContainer.get().equals(_targetContainer);
+                Optional<BlockPos> openContainer = mod.getItemStorage().getContainerPositionForMenu(slot.menu());
+                return ContainerStoredTracker.acceptsBoundContainer(openContainer,
+                        position -> position.equals(_targetContainer));
             });
         }
         _storedItems.startTracking();
@@ -52,6 +60,34 @@ public class StoreInContainerTask extends AbstractDoToStorageContainerTask {
 
     @Override
     protected Task onTick(AltoClef mod) {
+        if (_activeTransferTask != null) {
+            Player player = Minecraft.getInstance().player;
+            AbstractContainerMenu currentMenu = player == null ? null : player.containerMenu;
+            Optional<BlockPos> boundPosition = _activeTransferMenu == null
+                    ? Optional.empty()
+                    : mod.getItemStorage().getContainerPositionForMenu(_activeTransferMenu);
+            if (!ContainerDepositCompletion.isTransferSessionValid(
+                    _activeTransferMenu, currentMenu, boundPosition, _targetContainer)) {
+                _activeTransferTask = null;
+                _activeTransferMenu = null;
+                setDebugState("Transfer stopped because its container menu changed; recovering cursor");
+                if (!StorageHelper.getItemStackInCursorSlot().isEmpty()) {
+                    return ContainerDepositCompletion.returnCursorTask(mod);
+                }
+                return null;
+            }
+            if (!_activeTransferTask.isFinished(mod)) return _activeTransferTask;
+            _activeTransferTask = null;
+            _activeTransferMenu = null;
+        }
+        if (!StorageHelper.getItemStackInCursorSlot().isEmpty()) {
+            return ContainerDepositCompletion.returnCursorTask(mod);
+        }
+        if (ContainerDepositCompletion.shouldFinish(mod, _storedItems, _toStore, _getIfNotPresent)) {
+            return ContainerDepositCompletion.isClean()
+                    ? null
+                    : ContainerDepositCompletion.cleanupTask(mod);
+        }
         // Get more if we don't have & "get if not present" is true.
         if (_getIfNotPresent) {
             for (ItemTarget target : _toStore) {
@@ -71,6 +107,16 @@ public class StoreInContainerTask extends AbstractDoToStorageContainerTask {
     }
 
     @Override
+    protected void onResetForNewRun() {
+        _activeTransferTask = null;
+        _activeTransferMenu = null;
+        if (_storedItems != null) {
+            _storedItems.stopTracking();
+            _storedItems.resetForNewRun();
+        }
+    }
+
+    @Override
     protected Task onContainerOpenSubtask(AltoClef mod, ContainerCache containerCache) {
         // Move all items that aren't in the container
         for (ItemTarget target : _storedItems.getUnstoredItemTargetsYouCanStore(mod, _toStore)) {
@@ -84,16 +130,28 @@ public class StoreInContainerTask extends AbstractDoToStorageContainerTask {
                         target,
                         mod.getItemStorage().getItemCountContainer(target.getMatches()),
                         potentials,
-                        stack -> mod.getItemStorage().getSlotThatCanFitInOpenContainer(stack, false).isPresent());
+                        stack -> mod.getItemStorage().getSlotThatCanFitInOpenContainer(stack, true).isPresent());
                 if (bestPotential.isPresent()) {
                     ItemStack stackIn = StorageHelper.getItemStackInSlot(bestPotential.get());
-                    Optional<Slot> toMoveTo = mod.getItemStorage().getSlotThatCanFitInOpenContainer(stackIn, false);
+                    Optional<Slot> toMoveTo = mod.getItemStorage().getSlotThatCanFitInOpenContainer(stackIn, true);
                     if (toMoveTo.isEmpty()) {
                         setDebugState("CONTAINER FULL!");
                         return null;
                     }
+                    ItemStack atDestination = StorageHelper.getItemStackInSlot(toMoveTo.get());
+                    int existingCount = target.matches(atDestination.getItem()) ? atDestination.getCount() : 0;
+                    int stackLimit = atDestination.isEmpty()
+                            ? stackIn.getMaxStackSize() : atDestination.getMaxStackSize();
+                    int depositCount = ContainerDepositCompletion.depositCountForSlot(
+                            target.getTargetCount(), existingCount, stackLimit);
+                    if (depositCount <= 0) continue;
+                    ItemTarget destinationTarget = new ItemTarget(target,
+                            ContainerDepositCompletion.destinationStackGoal(existingCount, depositCount));
                     setDebugState("Moving to slot...");
-                    return new MoveItemToSlotFromInventoryTask(target, toMoveTo.get());
+                    _activeTransferTask = new MoveItemToSlotFromInventoryTask(destinationTarget, toMoveTo.get());
+                    Player player = Minecraft.getInstance().player;
+                    _activeTransferMenu = player == null ? null : player.containerMenu;
+                    return _activeTransferTask;
                 }
                 setDebugState("SHOULD NOT HAPPEN! No valid items detected.");
         }
@@ -103,16 +161,30 @@ public class StoreInContainerTask extends AbstractDoToStorageContainerTask {
 
     @Override
     public boolean isFinished(AltoClef mod) {
-        // We've stored all items
-        return _storedItems != null && _storedItems.getUnstoredItemTargetsYouCanStore(mod, _toStore).length == 0;
+        return ContainerDepositCompletion.isComplete(
+                ContainerDepositCompletion.shouldFinish(mod, _storedItems, _toStore, _getIfNotPresent),
+                StorageHelper.getItemStackInCursorSlot().isEmpty(),
+                ContainerDepositCompletion.craftingGridEmpty(),
+                StorageHelper.isPlayerInventoryOpen());
     }
 
     @Override
     protected boolean isEqual(Task other) {
         if (other instanceof StoreInContainerTask task) {
-            return task._targetContainer.equals(_targetContainer) && task._getIfNotPresent == _getIfNotPresent && Arrays.equals(task._toStore, _toStore);
+            return task._targetContainer.equals(_targetContainer)
+                    && task._getIfNotPresent == _getIfNotPresent
+                    && sameTargetKinds(task._toStore, _toStore);
         }
         return false;
+    }
+
+    static boolean sameTargetKinds(ItemTarget[] left, ItemTarget[] right) {
+        if (left.length != right.length) return false;
+        for (int index = 0; index < left.length; index++) {
+            if (!Arrays.equals(left[index].getMatches(), right[index].getMatches())
+                    || left[index].getTargetCount() < right[index].getTargetCount()) return false;
+        }
+        return true;
     }
 
     @Override

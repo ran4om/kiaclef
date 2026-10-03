@@ -2,11 +2,11 @@ package adris.altoclef.util.helpers;
 
 import adris.altoclef.Debug;
 import adris.altoclef.util.baritone.CachedProjectile;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.projectile.ExplosiveProjectileEntity;
-import net.minecraft.entity.projectile.ProjectileEntity;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.projectile.hurtingprojectile.AbstractHurtingProjectile;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Projectile motion math functions
@@ -16,13 +16,13 @@ public class ProjectileHelper {
     public static final double ARROW_GRAVITY_ACCEL = 0.05000000074505806;
     public static final double THROWN_ENTITY_GRAVITY_ACCEL = 0.03;
 
-    public static boolean hasGravity(ProjectileEntity entity) {
-        if (entity instanceof ExplosiveProjectileEntity) return false;
-        return !entity.hasNoGravity();
+    public static boolean hasGravity(Projectile entity) {
+        if (entity instanceof AbstractHurtingProjectile) return false;
+        return !entity.isNoGravity();
     }
 
     // If we shoot on a 2d plane, what is the 2d point on that trajectory closest to our player pos?
-    private static Vec3d getClosestPointOnFlatLine(double shootX, double shootZ, double velX, double velZ, double playerX, double playerZ) {
+    private static Vec3 getClosestPointOnFlatLine(double shootX, double shootZ, double velX, double velZ, double playerX, double playerZ) {
         double deltaX = playerX - shootX,
                 deltaZ = playerZ - shootZ;
         // Did da math I am smurt boi who knows basic calculus
@@ -31,11 +31,11 @@ public class ProjectileHelper {
         double hitX = shootX + velX * t,
                 hitZ = shootZ + velZ * t;
 
-        return new Vec3d(hitX, 0, hitZ);
+        return new Vec3(hitX, 0, hitZ);
     }
 
     public static double getFlatDistanceSqr(double shootX, double shootZ, double velX, double velZ, double playerX, double playerZ) {
-        return getClosestPointOnFlatLine(shootX, shootZ, velX, velZ, playerX, playerZ).squaredDistanceTo(playerX, 0, playerZ);
+        return getClosestPointOnFlatLine(shootX, shootZ, velX, velZ, playerX, playerZ).distanceToSqr(playerX, 0, playerZ);
     }
 
     private static double getArrowHitHeight(double gravity, double horizontalVel, double verticalVel, double initialHeight, double distanceTraveled) {
@@ -48,8 +48,8 @@ public class ProjectileHelper {
      * Does so by figuring out the closest X-Z coordinate of the arrow's trajectory and then using the height
      * of the arrow when it reaches that point as the result's Y value.
      */
-    public static Vec3d calculateArrowClosestApproach(Vec3d shootOrigin, Vec3d shootVelocity, double yGravity, Vec3d playerOrigin) {
-        Vec3d flatEncounter = getClosestPointOnFlatLine(shootOrigin.x, shootOrigin.z, shootVelocity.x, shootVelocity.z, playerOrigin.x, playerOrigin.z);
+    public static Vec3 calculateArrowClosestApproach(Vec3 shootOrigin, Vec3 shootVelocity, double yGravity, Vec3 playerOrigin) {
+        Vec3 flatEncounter = getClosestPointOnFlatLine(shootOrigin.x, shootOrigin.z, shootVelocity.x, shootVelocity.z, playerOrigin.x, playerOrigin.z);
         double encounterDistanceTraveled = (flatEncounter.subtract(shootOrigin.x, flatEncounter.y, shootOrigin.z)).length();
 
         double horizontalVel = Math.sqrt(shootVelocity.x * shootVelocity.x + shootVelocity.z * shootVelocity.z);
@@ -58,15 +58,15 @@ public class ProjectileHelper {
 
         double hitHeight = getArrowHitHeight(yGravity, horizontalVel, verticalVel, initialHeight, encounterDistanceTraveled);
 
-        return new Vec3d(flatEncounter.x, hitHeight, flatEncounter.z);
+        return new Vec3(flatEncounter.x, hitHeight, flatEncounter.z);
     }
 
-    public static Vec3d calculateArrowClosestApproach(CachedProjectile projectile, Vec3d pos) {
+    public static Vec3 calculateArrowClosestApproach(CachedProjectile projectile, Vec3 pos) {
         return calculateArrowClosestApproach(projectile.position, projectile.velocity, projectile.gravity, pos);
     }
 
-    public static Vec3d calculateArrowClosestApproach(CachedProjectile projectile, ClientPlayerEntity player) {
-        return calculateArrowClosestApproach(projectile, player.getPos());
+    public static Vec3 calculateArrowClosestApproach(CachedProjectile projectile, LocalPlayer player) {
+        return calculateArrowClosestApproach(projectile, player.position());
     }
 
     public static double[] calculateAnglesForSimpleProjectileMotion(double launchHeight, double launchTargetDistance, double launchVelocity, double gravity) {
@@ -90,25 +90,25 @@ public class ProjectileHelper {
         return new double[] {Math.min(angles[0], angles[1]), Math.max(angles[0], angles[1])};
     }
 
-    public static Vec3d getThrowOrigin(Entity entity) {
+    public static Vec3 getThrowOrigin(Entity entity) {
         // Minecraft Magic Number
-        return entity.getPos().subtract(0, 0.1, 0);
+        return entity.position().subtract(0, 0.1, 0);
     }
 
     // Unable to figure out how to extract multiple roots, this is too complicated for engineering major like me.
     @SuppressWarnings("UnnecessaryLocalVariable")
     @Deprecated
-    private static double getNearestTimeOfShotProjectile(Vec3d shootOrigin, Vec3d shootVelocity, double yGravity, Vec3d playerOrigin) {
+    private static double getNearestTimeOfShotProjectile(Vec3 shootOrigin, Vec3 shootVelocity, double yGravity, Vec3 playerOrigin) {
         // Formatted for equations and ease of writing. This is why I'm not minoring in math.
-        Vec3d D = playerOrigin.subtract(shootOrigin);
-        Vec3d V = shootVelocity;
+        Vec3 D = playerOrigin.subtract(shootOrigin);
+        Vec3 V = shootVelocity;
         double g = yGravity;
 
         // Cubic terms
         double a = (g * g) / 2.0;
         double b = -(3.0 * g * V.y) / 2.0;
-        double c = V.lengthSquared() + (g * V.y);
-        double d = -1 * V.dotProduct(D);
+        double c = V.lengthSqr() + (g * V.y);
+        double d = -1 * V.dot(D);
 
 
         // Now that we have our cubic equation for SQUARED distance, find the "zero" points.

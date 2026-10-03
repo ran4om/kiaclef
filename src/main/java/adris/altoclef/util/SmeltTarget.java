@@ -1,6 +1,6 @@
 package adris.altoclef.util;
 
-import net.minecraft.item.Item;
+import net.minecraft.world.item.Item;
 
 import java.util.Objects;
 

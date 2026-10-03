@@ -8,7 +8,7 @@ import adris.altoclef.util.CraftingRecipe;
 import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.RecipeTarget;
 import adris.altoclef.util.helpers.StorageHelper;
-import net.minecraft.item.Item;
+import net.minecraft.world.item.Item;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.Arrays;
@@ -93,7 +93,7 @@ public class CollectRecipeCataloguedResourcesTask extends Task {
             int count = itemCount.get(item);
             if (count > 0) {
                 if (mod.getItemStorage().getItemCount(item) < count) {
-                    setDebugState("Getting " + item.getTranslationKey());
+                    setDebugState("Getting " + item.getDescriptionId());
                     return TaskCatalogue.getItemTask(item, count);
                 }
             }

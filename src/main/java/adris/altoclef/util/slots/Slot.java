@@ -1,16 +1,16 @@
 package adris.altoclef.util.slots;
 
 import adris.altoclef.Debug;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ingame.CraftingScreen;
-import net.minecraft.client.gui.screen.ingame.FurnaceScreen;
-import net.minecraft.client.gui.screen.ingame.GenericContainerScreen;
-import net.minecraft.client.gui.screen.ingame.SmithingScreen;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.screen.GenericContainerScreenHandler;
-import net.minecraft.screen.PlayerScreenHandler;
-import net.minecraft.screen.ScreenHandler;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.CraftingScreen;
+import net.minecraft.client.gui.screens.inventory.FurnaceScreen;
+import net.minecraft.client.gui.screens.inventory.ContainerScreen;
+import net.minecraft.client.gui.screens.inventory.SmithingScreen;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 
 import java.util.Iterator;
 import java.util.Objects;
@@ -79,8 +79,8 @@ public abstract class Slot {
 
     public static Iterable<Slot> getCurrentScreenSlots() {
         return () -> new Iterator<>() {
-            final ClientPlayerEntity player = MinecraftClient.getInstance().player;
-            final ScreenHandler handler = player != null? player.currentScreenHandler : null;
+            final LocalPlayer player = Minecraft.getInstance().player;
+            final AbstractContainerMenu handler = player != null? player.containerMenu : null;
             int i = -1;
             final int MAX = handler != null? handler.slots.size() : 0;
             @Override
@@ -146,9 +146,9 @@ public abstract class Slot {
      * @return Whether this slot exists within the player's inventory or in a container that's disconnected from the player's inventory.
      */
     public boolean isSlotInPlayerInventory() {
-        ScreenHandler handler = MinecraftClient.getInstance().player != null? MinecraftClient.getInstance().player.currentScreenHandler : null;
+        AbstractContainerMenu handler = Minecraft.getInstance().player != null? Minecraft.getInstance().player.containerMenu : null;
         int windowSlot = getWindowSlot();
-        if (handler instanceof PlayerScreenHandler) {
+        if (handler instanceof InventoryMenu) {
             // Everything visible is player inventory.
             return true;
         }

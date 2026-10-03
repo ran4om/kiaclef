@@ -18,6 +18,10 @@ public abstract class Task {
     private boolean _stopped = false;
 
     private boolean _active = false;
+    private boolean _needsInitialTickBeforeTerminalCheck;
+
+    private TaskFailure.Snapshot _pendingChildFailure;
+    private TaskFailure.Snapshot _propagatedChildFailure;
 
     public void tick(AltoClef mod, TaskChain parentChain) {
         parentChain.addTaskToChain(this);
@@ -27,6 +31,7 @@ public abstract class Task {
             onStart(mod);
             _first = false;
             _stopped = false;
+            _needsInitialTickBeforeTerminalCheck = false;
         }
         if (_stopped) return;
 
@@ -38,7 +43,8 @@ public abstract class Task {
         }
         // We have a sub task
         if (newSub != null) {
-            if (!newSub.isEqual(_sub)) {
+            boolean sameSubtask = _sub != null && newSub.isEqual(_sub);
+            if (!sameSubtask) {
                 if (canBeInterrupted(mod, _sub, newSub)) {
                     // Our sub task is new
                     if (_sub != null) {
@@ -47,17 +53,38 @@ public abstract class Task {
                     }
 
                     _sub = newSub;
+                    _pendingChildFailure = null;
+                    _propagatedChildFailure = null;
                 }
             }
 
+            // Give the parent one tick to replace a failed child. If it keeps the
+            // same child, the failure is unhandled and can safely bubble upward.
+            if (sameSubtask && _pendingChildFailure != null && !shouldDeferFailure(mod)) {
+                _propagatedChildFailure = _pendingChildFailure;
+                _pendingChildFailure = null;
+            }
+
             // Run our child
-            _sub.tick(mod, parentChain);
+            if (_propagatedChildFailure == null || shouldDeferFailure(mod)) {
+                _sub.tick(mod, parentChain);
+                if (_propagatedChildFailure == null) {
+                    _pendingChildFailure = _sub.getFailureSnapshot();
+                }
+            }
         } else {
             // We are null
             if (_sub != null && canBeInterrupted(mod, _sub, null)) {
                 // Our previous sub must be interrupted.
                 _sub.stop(mod);
                 _sub = null;
+                _pendingChildFailure = null;
+                _propagatedChildFailure = null;
+            } else if (_sub != null) {
+                // A forcing descendant blocked the stop, so keep ticking it until
+                // its required cleanup is complete.
+                _sub.tick(mod, parentChain);
+                _pendingChildFailure = _sub.getFailureSnapshot();
             }
         }
     }
@@ -66,6 +93,30 @@ public abstract class Task {
         _first = true;
         _active = false;
         _stopped = false;
+        _pendingChildFailure = null;
+        _propagatedChildFailure = null;
+        if (_sub != null) {
+            _sub.reset();
+        }
+    }
+
+    /** Resets lifecycle and cached failure state for an explicitly new run. */
+    public final void restartForNewRun() {
+        reset();
+        onResetForNewRun();
+        _needsInitialTickBeforeTerminalCheck = true;
+        if (_sub != null) {
+            _sub.restartForNewRun();
+        }
+    }
+
+    /** Whether a newly assigned run must execute onStart before terminal checks. */
+    public boolean needsInitialTickBeforeTerminalCheck() {
+        return _needsInitialTickBeforeTerminalCheck;
+    }
+
+    /** Clears task-specific terminal state before this object is run again. */
+    protected void onResetForNewRun() {
     }
 
     public void stop(AltoClef mod) {
@@ -108,6 +159,8 @@ public abstract class Task {
             _sub.interrupt(mod, interruptTask);
         }
 
+        _pendingChildFailure = null;
+        _propagatedChildFailure = null;
         _first = true;
     }
 
@@ -168,18 +221,40 @@ public abstract class Task {
         return thisOrChildSatisfies(task -> task instanceof TimeoutWanderTask);
     }
 
+    /** Returns this task's failure or one from a child that it has latched. */
+    public TaskFailure.Snapshot getFailureSnapshot() {
+        TaskFailure.Snapshot ownFailure = getOwnFailureSnapshot();
+        if (ownFailure != null) return ownFailure;
+        return _propagatedChildFailure;
+    }
+
+    /** Returns failure reported by this task itself, without child failures. */
+    public TaskFailure.Snapshot getOwnFailureSnapshot() {
+        if (this instanceof TaskFailure failure && failure.hasFailed()) {
+            return new TaskFailure.Snapshot(failure.getFailureReason());
+        }
+        return null;
+    }
+
+    /** True while this task tree contains work that must finish before stopping. */
+    public boolean shouldDeferFailure(AltoClef mod) {
+        for (Task task = this; task != null; task = task._sub) {
+            if (task.isActive() && task instanceof ITaskCanForce force && force.shouldForce(mod, null)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Sometimes a task just can NOT be bothered to be interrupted right now.
      * For instance, if we're in mid air and MUST complete the parkour movement.
      */
     private boolean canBeInterrupted(AltoClef mod, Task subTask, Task toInterruptWith) {
         if (subTask == null) return true;
-        // Our task can declare that is FORCES itself to be active NOW.
-        return (subTask.thisOrChildSatisfies(task -> {
-            if (task instanceof ITaskCanForce canForce) {
-                return !canForce.shouldForce(mod, toInterruptWith);
-            }
-            return true;
-        }));
+        // A single forcing descendant must be able to protect the subtree. An
+        // ordinary ancestor cannot mask that request.
+        return !subTask.thisOrChildSatisfies(task -> task.isActive() && task instanceof ITaskCanForce canForce
+                && canForce.shouldForce(mod, toInterruptWith));
     }
 }

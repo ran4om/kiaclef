@@ -7,8 +7,10 @@ import adris.altoclef.util.ItemTarget;
 import adris.altoclef.util.helpers.StlHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.Slot;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.inventory.AbstractFurnaceMenu;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.Arrays;
 import java.util.List;
@@ -16,6 +18,9 @@ import java.util.Optional;
 import java.util.function.Function;
 
 public class MoveItemToSlotTask extends Task {
+
+    private static long _lastFurnaceDiagnosticNanos;
+    private static int _furnaceDiagnosticLines;
 
     private final ItemTarget _toMove;
     private final Slot _destination;
@@ -34,7 +39,9 @@ public class MoveItemToSlotTask extends Task {
 
     @Override
     protected Task onTick(AltoClef mod) {
-        if (mod.getSlotHandler().canDoSlotAction()) {
+        boolean canDoSlotAction = mod.getSlotHandler().canDoSlotAction();
+        logFurnaceSlotState(canDoSlotAction);
+        if (canDoSlotAction) {
             // Rough plan
             // - If empty slot or wrong item
             //      Find best matching item (smallest count over target, or largest count if none over)
@@ -65,7 +72,7 @@ public class MoveItemToSlotTask extends Task {
                     }
                 }
                 if (toPlace.isEmpty()) {
-                    Debug.logError("Called MoveItemToSlotTask when item/not enough item is available! valid items: " + StlHelper.toString(validItems, Item::getTranslationKey));
+                    Debug.logError("Called MoveItemToSlotTask when item/not enough item is available! valid items: " + StlHelper.toString(validItems, Item::getDescriptionId));
                     return null;
                 }
                 return new ClickSlotTask(toPlace.get());
@@ -128,5 +135,21 @@ public class MoveItemToSlotTask extends Task {
             }
         }
         return Optional.ofNullable(bestMatch);
+    }
+
+    private void logFurnaceSlotState(boolean canDoSlotAction) {
+        if (!Boolean.getBoolean("altoclef.builderPlacementDiagnostics") || _furnaceDiagnosticLines >= 150) return;
+        if (Minecraft.getInstance().player == null
+                || !(Minecraft.getInstance().player.containerMenu instanceof AbstractFurnaceMenu)) return;
+
+        long now = System.nanoTime();
+        if (_lastFurnaceDiagnosticNanos != 0L && now - _lastFurnaceDiagnosticNanos < 1_000_000_000L) return;
+        _lastFurnaceDiagnosticNanos = now;
+        _furnaceDiagnosticLines++;
+
+        ItemStack cursor = StorageHelper.getItemStackInCursorSlot();
+        ItemStack destination = StorageHelper.getItemStackInSlot(_destination);
+        Debug.logInternal("[FURNACE-SLOT-DIAG] target=" + _toMove + ", destination=" + _destination
+                + " stack=" + destination + ", cursor=" + cursor + ", canDoSlotAction=" + canDoSlotAction);
     }
 }

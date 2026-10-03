@@ -1,11 +1,11 @@
 package adris.altoclef.trackers.storage;
 
 import adris.altoclef.util.Dimension;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.FurnaceScreenHandler;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.inventory.AbstractFurnaceMenu;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.core.BlockPos;
 
 import java.util.HashMap;
 import java.util.function.Consumer;
@@ -25,17 +25,17 @@ public class ContainerCache {
         _containerType = containerType;
     }
 
-    public void update(ScreenHandler screenHandler, Consumer<ItemStack> onStack) {
+    public void update(AbstractContainerMenu screenHandler, Consumer<ItemStack> onStack) {
         _itemCounts.clear();
         _emptySlots = 0;
         int start = 0;
         int end = screenHandler.slots.size() - (4*9); // subtract by player inventory
         // do NOT count the furnace output slot as an empty slot, it cannot be used.
-        boolean isFurnace = (screenHandler instanceof FurnaceScreenHandler);
+        boolean isFurnace = (screenHandler instanceof AbstractFurnaceMenu);
 
         // Iterate through all STORAGE slots
         for (int i = start; i < end; ++i) {
-            ItemStack stack = screenHandler.slots.get(i).getStack().copy();
+            ItemStack stack = screenHandler.slots.get(i).getItem().copy();
 
             if (stack.isEmpty()) {
                 // Ignore furnace output slot
