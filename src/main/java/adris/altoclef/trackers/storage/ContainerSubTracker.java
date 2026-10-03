@@ -51,10 +51,15 @@ import java.util.function.Predicate;
  */
 public class ContainerSubTracker extends Tracker {
 
+    private static final boolean DIAGNOSTICS = Boolean.getBoolean("altoclef.containerSessionDiagnostics");
+
     private final ContainerMenuSession _containerSession = new ContainerMenuSession();
     private final HashMap<Dimension, HashMap<BlockPos, ContainerCache>> _containerCaches = new HashMap<>();
     private ContainerCache _enderChestCache;
     private boolean _hasSentError;
+    // Client game time can jump backwards when the server resyncs it, so pending
+    // interactions are aged with a monotonic client tick counter instead.
+    private long _clientTick;
 
     public ContainerSubTracker(TrackerManager manager) {
         super(manager);
@@ -69,18 +74,24 @@ public class ContainerSubTracker extends Tracker {
             Minecraft minecraft = Minecraft.getInstance();
             LocalPlayer player = minecraft.player;
             if (player != null && minecraft.level == evt.world) {
-                onBlockInteract(evt.world, player, player.containerMenu, blockPos, bs.getBlock(),
-                        evt.world.getGameTime());
+                onBlockInteract(evt.world, player, player.containerMenu, blockPos, bs.getBlock(), _clientTick);
             }
         });
         EventBus.subscribe(ScreenOpenEvent.class, evt -> {
             if (!evt.preOpen) onScreenChanged(evt.screen);
         });
-        EventBus.subscribe(NonBlockInteractEvent.class, evt -> _containerSession.clearPendingInteraction());
+        EventBus.subscribe(NonBlockInteractEvent.class, evt -> {
+            if (DIAGNOSTICS) Debug.logInternal("[CONTAINER_SESSION] non-block interact clears pending, tick=" + _clientTick);
+            _containerSession.clearPendingInteraction();
+        });
     }
 
     private void onBlockInteract(Object world, Object player, Object originMenu,
                                  BlockPos pos, Block block, long currentTick) {
+        if (DIAGNOSTICS) {
+            Debug.logInternal("[CONTAINER_SESSION] interact pos=" + pos.toShortString() + ",block=" + block
+                    + ",tracked=" + isTrackedContainerBlock(block) + ",tick=" + currentTick);
+        }
         if (isTrackedContainerBlock(block)) {
             _containerSession.noteInteraction(world, player, originMenu, pos, block, currentTick);
         }
@@ -95,13 +106,18 @@ public class ContainerSubTracker extends Tracker {
                 && screen instanceof MenuAccess<?> menuAccess
                 && menuAccess.getMenu() == playerMenu;
 
-        long currentTick = minecraft.level == null ? 0 : minecraft.level.getGameTime();
-        _containerSession.onScreenChanged(minecraft.level, player, playerMenu, trackedScreen, currentTick,
+        _containerSession.onScreenChanged(minecraft.level, player, playerMenu, trackedScreen, _clientTick,
                 screenMenuMatchesPlayerMenu,
                 block -> containerMenuMatchesBlock(block, playerMenu),
                 (position, block) -> minecraft.level != null
                         && minecraft.level.getBlockState(position).getBlock() == block);
         _hasSentError = false;
+        if (DIAGNOSTICS) {
+            Debug.logInternal("[CONTAINER_SESSION] screen=" + (screen == null ? "null" : screen.getClass().getSimpleName())
+                    + ",tracked=" + trackedScreen + ",menuMatches=" + screenMenuMatchesPlayerMenu
+                    + ",bound=" + _containerSession.getBoundContainer(minecraft.level, player, playerMenu,
+                    (position, block) -> true).isPresent() + ",tick=" + _clientTick);
+        }
     }
 
     static boolean isTrackedContainerBlock(Block block) {
@@ -126,12 +142,13 @@ public class ContainerSubTracker extends Tracker {
                 || BrewingStandScreen.class.isAssignableFrom(screenClass);
     }
     public void onServerTick() {
+        _clientTick++;
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null || minecraft.level == null) {
             _containerSession.clear();
             return;
         }
-        _containerSession.expirePendingInteraction(minecraft.level.getGameTime());
+        _containerSession.expirePendingInteraction(_clientTick);
 
         AbstractContainerMenu handler = minecraft.player.containerMenu;
         Optional<ContainerMenuSession.BoundContainer> openContainer = getBoundContainer(handler);

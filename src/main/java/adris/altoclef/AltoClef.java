@@ -17,6 +17,7 @@ import adris.altoclef.trackers.*;
 import adris.altoclef.trackers.storage.ContainerSubTracker;
 import adris.altoclef.trackers.storage.ItemStorageTracker;
 import adris.altoclef.ui.CommandStatusOverlay;
+import adris.altoclef.ui.AltoClefKeybinds;
 import adris.altoclef.ui.MessagePriority;
 import adris.altoclef.ui.MessageSender;
 import adris.altoclef.util.helpers.InputHelper;
@@ -93,6 +94,8 @@ public class AltoClef implements net.fabricmc.api.ClientModInitializer {
         // However, some things (like resources) may still be uninitialized.
         // As such, nothing will be loaded here but basic initialization.
         EventBus.subscribe(TitleScreenEntryEvent.class, evt -> onInitializeLoad());
+        // Key mappings must be registered before the options file is read.
+        AltoClefKeybinds.register(this);
         // Quick Play can enter a world without constructing the title screen.
         // Its JOIN callback runs after the player and world are installed.
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> onInitializeLoad());

@@ -4,14 +4,14 @@
     "coordinateSpace": "region-local authored coordinate; expected placed chest entity remains empty."
   },
   "compatibilityUncertainty": [
-    "The official 26.2 MinecraftDataVersion was not established from local mod metadata; 0 follows the existing MultiBuildAcceptanceScenario writer precedent.",
+    "MinecraftDataVersion is 4903, the 26.2 data version reported by the game's DataFixer. A value of 0 made Litematica 0.28.8 run its 1.13 data fixers, which threw ArrayIndexOutOfBoundsException (Run 171).",
     "The coordinate oracle below was corrected against Litematica 0.28.8 PositionUtils.getTransformedBlockPos bytecode, but native fixture loading, Baritone's active snapshot, and final server block-state placement remain to be verified in the packaged runtime."
   ],
   "fixture": "altoclef-natural-recovery-rotated-4x2x1.litematic",
   "format": {
     "litematicVersion": 7,
-    "minecraftDataVersion": 0,
-    "minecraftDataVersionNote": "Pinned to the harness writer precedent (MinecraftDataVersion=0); this generic marker is accepted by current project adapter policy but is not asserted to be the official 26.2 data-version number.",
+    "minecraftDataVersion": 4903,
+    "minecraftDataVersionNote": "4903 matches the 26.2 runtime DataFixer target logged by Litematica.",
     "subVersion": 1
   },
   "generation": {
@@ -280,7 +280,7 @@
     }
   ],
   "schema": "altoclef-litematic-fixture-manifest/v1",
-  "sha256": "0d13a49ff50addc3cb18cbff515b446886538e13b3d651a191db774a7c85937c",
+  "sha256": "0849421a77d0b3b4f346fe7882fc6b4a8b888723982065fd3f04949f71c108b2",
   "verification": {
     "independentDecode": "After writing, reopen with nbtlib (separate pass) and independently decode all palette/index cells, NBT metadata and chest payload; verify SHA-256.",
     "loaderAcceptance": "UNVERIFIED: actual Litematica native loader acceptance, active placement transform, and state transform require root to package/run the candidate in Minecraft 26.2. This artifact generation is not gameplay evidence.",

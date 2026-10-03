@@ -4,6 +4,18 @@ Alto Clef has a variety of commands, settings and modes. This will give users an
 
 Keep in mind this project is still in rapid development. A lot of features are placeholders and a work in progress.
 
+## Control panel (Minecraft 26.2)
+
+Press **J** in-game to open the Alto Clef control panel. Every button runs a normal command, so it behaves exactly like typing it in chat. The panel has three tabs:
+
+- **Tasks** shows what the bot is doing, how long the current task has run, and how the last one ended (done, cancelled, or the failure reason). Type an item name (Tab completes catalogued names) and a count, then press **Get**. **+ List** queues several items and **Get list** collects them all in one `@get [..]` request. Preset buttons cover common requests: wood, iron, diamonds, food, iron gear, and beating the game.
+- **Build** lists `.litematic`, `.schem`, and `.schematic` files in your `schematics` folder. Pick one and press **Build**, or build the active Litematica placement. Materials are gathered and crafted first.
+- **Console** runs any command, keeps a history (Up/Down, or click a recent command), and has buttons for status, inventory, coords, follow, idle, deposit, reloading settings, and help. It also shows or hides the task HUD.
+
+**Stop** in the panel header cancels the current task. `Ctrl+K` does the same from anywhere. The key bindings live under *Options > Controls > Alto Clef*: open the control panel (J), stop the current task (unbound), and toggle the task HUD (unbound).
+
+The task HUD in the top-left corner shows the controlling chain, the elapsed time of the user task, and the tail of the task chain with the current leaf task highlighted. It hides itself while the control panel is open.
+
 ## Commands
 
 Commands are prefixed with `@`. Here's a list along with their functions:

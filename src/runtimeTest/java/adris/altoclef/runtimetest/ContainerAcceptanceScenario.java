@@ -253,6 +253,7 @@ public final class ContainerAcceptanceScenario {
         BlockState chestState = Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.NORTH);
         level.setBlock(lootChest, chestState, 3);
         level.setBlock(stashChest, chestState, 3);
+        clearLooseItems(level, lootChest);
         Container loot = chestAt(level, lootChest);
         Container stash = chestAt(level, stashChest);
         if (loot == null || stash == null) {
@@ -357,6 +358,7 @@ public final class ContainerAcceptanceScenario {
             return;
         }
         level.setBlock(overflowChest, Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.NORTH), 3);
+        clearLooseItems(level, overflowChest);
         Container overflow = chestAt(level, overflowChest);
         if (overflow == null) {
             publishOverflowSetupFailure("chest block entity missing after placement");
@@ -616,6 +618,25 @@ public final class ContainerAcceptanceScenario {
         return true;
     }
 
+    /** Drops left by arena setup or earlier runs would otherwise be picked up and pollute exact counts. */
+    private static void clearLooseItems(ServerLevel level, BlockPos center) {
+        for (net.minecraft.world.entity.item.ItemEntity item : level.getEntitiesOfClass(
+                net.minecraft.world.entity.item.ItemEntity.class, new net.minecraft.world.phys.AABB(center).inflate(48))) {
+            item.discard();
+        }
+    }
+
+    private static String playerSlotSnapshot(Player player) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (stack.isEmpty()) continue;
+            if (sb.length() > 1) sb.append(';');
+            sb.append(slot).append('=').append(BuiltInRegistries.ITEM.getKey(stack.getItem())).append('x').append(stack.getCount());
+        }
+        return sb.append(']').toString();
+    }
+
     private static int inventoryCount(Player player) {
         int count = 0;
         for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
@@ -681,7 +702,7 @@ public final class ContainerAcceptanceScenario {
         return "inventory=" + inventoryCount(player) + ",diamond=" + count(player, Items.DIAMOND)
                 + ",emerald=" + count(player, Items.EMERALD) + ",oakLog=" + count(player, Items.OAK_LOG)
                 + ",oakPlanks=" + count(player, Items.OAK_PLANKS) + ",uiClean=" + uiClean(player)
-                + "," + uiSnapshot(player)
+                + "," + uiSnapshot(player) + ",playerSlots=" + playerSlotSnapshot(player)
                 + ",loot=" + containerSnapshot(loot) + ",stash=" + containerSnapshot(stash)
                 + ",overflow=" + containerSnapshot(overflow);
     }

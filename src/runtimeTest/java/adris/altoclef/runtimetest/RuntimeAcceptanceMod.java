@@ -252,6 +252,7 @@ public final class RuntimeAcceptanceMod implements ClientModInitializer {
     private boolean fallbackVerificationPending;
     private long fallbackVerificationStarted;
     private ContainerAcceptanceScenario containerScenario;
+    private UiScreenshotScenario uiScenario;
     private CropAcceptanceScenario cropScenario;
     private AnimalFoodAcceptanceScenario animalFoodScenario;
     private FoodRangeAcceptanceScenario foodRangeScenario;
@@ -428,7 +429,7 @@ public final class RuntimeAcceptanceMod implements ClientModInitializer {
         SAPLING_VERIFY, SAPLING_PROPAGULE_VERIFY,
         STRIPPED_LOGS, MIXED_BUILD_SETUP, MIXED_BUILD, MIXED_VERIFY,
         SMITHING_SETUP, SMITHING, SMELT_SETUP, SMELT, FALLBACK_SETUP, FALLBACK,
-        CONTAINERS, CROPS, ANIMAL_FOOD, FOOD_RANGE, FOOD_BLOCK_RANGE, MATERIAL_LEAF, MUD_ROOT, KELP, BUILD_CLEANUP_CAPACITY, AZALEA_LEAVES, HANGING_ROOTS, SMALL_DRIPLEAF, DEFAULT_FOOD_CHOOSER, BUILD_INVENTORY_CLEANUP, COMBAT_LOOT, MOB_DEFENSE_CAPACITY, MULTIBUILD, LITEMATICA_RECOVERY, NATURAL_CHECKPOINT, NATURAL_RESOURCE_LIST, NATURAL_RESOURCE_VERIFY, NATURAL_BUILD_TRAVEL, NATURAL_BUILD_SETUP, NATURAL_BUILD, NATURAL_BUILD_VERIFY,
+        UI_SCREENSHOT, CONTAINERS, CROPS, ANIMAL_FOOD, FOOD_RANGE, FOOD_BLOCK_RANGE, MATERIAL_LEAF, MUD_ROOT, KELP, BUILD_CLEANUP_CAPACITY, AZALEA_LEAVES, HANGING_ROOTS, SMALL_DRIPLEAF, DEFAULT_FOOD_CHOOSER, BUILD_INVENTORY_CLEANUP, COMBAT_LOOT, MOB_DEFENSE_CAPACITY, MULTIBUILD, LITEMATICA_RECOVERY, NATURAL_CHECKPOINT, NATURAL_RESOURCE_LIST, NATURAL_RESOURCE_VERIFY, NATURAL_BUILD_TRAVEL, NATURAL_BUILD_SETUP, NATURAL_BUILD, NATURAL_BUILD_VERIFY,
         CONCRETE_SETUP, CONCRETE, CONCRETE_VERIFY, HINGE_FAILURE_VERIFY, CRAFTER_BUILD_VERIFY,
         MANUAL_STAIRS_SETUP, MANUAL_STAIRS,
         MANUAL_TEMPLATE_SETUP, MANUAL_TEMPLATE, MANUAL_GRID_SETUP,
@@ -656,7 +657,16 @@ public final class RuntimeAcceptanceMod implements ClientModInitializer {
                     if (phase == Phase.FAILED) return;
                 }
                 String startMode = requestedStartMode;
-                if ("containers".equalsIgnoreCase(startMode)) {
+                if ("ui".equalsIgnoreCase(startMode)) {
+                    append("SKIP\truntimeStart=ui\tgameplay phases skipped; control panel tabs and HUD captured as screenshots");
+                    uiScenario = new UiScreenshotScenario(Debug.jankModInstance, this::append, this::fail, () -> {
+                        append("SUMMARY\tPASS\t26.2 runtimeStart=ui opened the Alto Clef control panel, switched all tabs, and captured panel and HUD screenshots without errors");
+                        phase = Phase.DONE;
+                        writeResult();
+                    });
+                    phase = Phase.UI_SCREENSHOT;
+                    phaseStarted = ticks;
+                } else if ("containers".equalsIgnoreCase(startMode)) {
                     append("SKIP\truntimeStart=containers\tresource gathering/build phases skipped; prepared chests test loot/deposit/stash transactions");
                     containerScenario = new ContainerAcceptanceScenario(Debug.jankModInstance,
                             this::append, this::fail, () -> {
@@ -948,6 +958,10 @@ public final class RuntimeAcceptanceMod implements ClientModInitializer {
             return;
         }
         if (phase == Phase.DONE || phase == Phase.FAILED) return;
+        if (phase == Phase.UI_SCREENSHOT) {
+            uiScenario.tick();
+            return;
+        }
         if (phase == Phase.CONTAINERS) {
             containerScenario.tick();
             return;

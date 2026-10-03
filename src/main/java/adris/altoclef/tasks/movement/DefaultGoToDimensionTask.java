@@ -333,7 +333,8 @@ public class DefaultGoToDimensionTask extends Task {
             long dz = _lastCenter == null ? 0 : center.getZ() - _lastCenter.getZ();
             boolean reset = _lastDimension != dimension || _lastCenter == null
                     || dx * dx + dy * dy + dz * dz > 64;
-            if (reset || gameTime - _lastScanTick >= LOCAL_PORTAL_SCAN_INTERVAL_TICKS) {
+            if (reset || gameTime < _lastScanTick
+                    || gameTime - _lastScanTick >= LOCAL_PORTAL_SCAN_INTERVAL_TICKS) {
                 _lastScanTick = gameTime;
                 _lastDimension = dimension;
                 _lastCenter = center.immutable();

@@ -55,7 +55,7 @@ import java.util.concurrent.ArrayBlockingQueue;
  * command after {@link #begin}; tick observes that command and owns its verdict.
  */
 public final class LitematicaRecoveryAcceptanceScenario {
-    public static final String FIXTURE_SHA256 = "0d13a49ff50addc3cb18cbff515b446886538e13b3d651a191db774a7c85937c";
+    public static final String FIXTURE_SHA256 = "0849421a77d0b3b4f346fe7882fc6b4a8b888723982065fd3f04949f71c108b2";
     private static final String RESOURCE = "/fixtures/altoclef-natural-recovery-rotated-4x2x1.litematic";
     // The packaged runtime runner defaults to 2,400 seconds. Leave six minutes
     // for client launch/save setup, then keep the scenario itself under 34 minutes.

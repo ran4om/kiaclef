@@ -163,6 +163,11 @@ public class UserTaskChain extends SingleTaskChain {
         mod.getClientBaritone().getInputOverrideHandler().clearAllKeys();
     }
 
+    /** Seconds since the current user task started, or 0 when no user task is running. */
+    public double getTaskElapsedSeconds() {
+        return isActive() ? _taskStopwatch.time() : 0;
+    }
+
     public boolean isRunningIdleTask() {
         return isActive() && _runningIdleTask;
     }

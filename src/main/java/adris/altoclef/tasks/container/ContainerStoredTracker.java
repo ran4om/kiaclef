@@ -35,7 +35,14 @@ public class ContainerStoredTracker {
     public void startTracking() {
         if (_tracking) return;
         _slotClickChangedSubscription = EventBus.subscribe(SlotClickChangedEvent.class, evt -> {
-            if (shouldCountDeposit(evt.menu().getClass(), evt.playerInventorySlot(), _acceptDeposit.test(evt))) {
+            boolean counted = shouldCountDeposit(evt.menu().getClass(), evt.playerInventorySlot(), _acceptDeposit.test(evt));
+            if (Boolean.getBoolean("altoclef.containerSessionDiagnostics")) {
+                adris.altoclef.Debug.logInternal("[CONTAINER_STORED] menu=" + evt.menu().getClass().getSimpleName()
+                        + ",playerSlot=" + evt.playerInventorySlot() + ",accepted=" + _acceptDeposit.test(evt)
+                        + ",counted=" + counted + ",before=" + evt.before() + ",after=" + evt.after()
+                        + ",totals=" + _totalDeposited);
+            }
+            if (counted) {
                 ItemStack before = evt.before();
                 ItemStack after = evt.after();
                 if (before.getItem() != after.getItem()) {

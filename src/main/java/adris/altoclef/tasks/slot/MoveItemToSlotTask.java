@@ -71,6 +71,10 @@ public class MoveItemToSlotTask extends Task {
                         toPlace = getBestSlotToPickUp(mod, validItems);
                     }
                 }
+                if (Boolean.getBoolean("altoclef.containerSessionDiagnostics")) {
+                    Debug.logInternal("[MOVE_SLOT] pick target=" + _toMove + ",dest=" + _destination
+                            + ",atDest=" + atTarget + ",held=" + currentHeld + ",from=" + toPlace.orElse(null));
+                }
                 if (toPlace.isEmpty()) {
                     Debug.logError("Called MoveItemToSlotTask when item/not enough item is available! valid items: " + StlHelper.toString(validItems, Item::getDescriptionId));
                     return null;
@@ -79,6 +83,11 @@ public class MoveItemToSlotTask extends Task {
             }
 
             int currentlyPlaced = Arrays.asList(validItems).contains(atTarget.getItem()) ? atTarget.getCount() : 0;
+            if (Boolean.getBoolean("altoclef.containerSessionDiagnostics")) {
+                Debug.logInternal("[MOVE_SLOT] target=" + _toMove + ",dest=" + _destination + ",atDest=" + atTarget
+                        + ",held=" + currentHeld + ",menu=" + (Minecraft.getInstance().player == null ? "none"
+                        : Minecraft.getInstance().player.containerMenu.getClass().getSimpleName()));
+            }
             if (currentHeld.getCount() + currentlyPlaced <= _toMove.getTargetCount()) {
                 // Just place all of 'em
                 return new ClickSlotTask(_destination);

@@ -61,10 +61,13 @@ public class CraftGenericManuallyTask extends Task implements ITaskUsesCraftingG
                 - outputCursorCount
                 // The player crafting grid is included by InventorySubTracker while the inventory screen is open.
                 - (!bigCrafting ? matchingOutputInputsInGrid : 0);
+        // The output slot only previews one craft from whatever is already in the grid.
+        // Counting it as produced output makes a fully loaded grid look over-filled, and the
+        // over-satisfied right-click below then cycles items between cursor and slot forever.
         int requiredCraftCount = getRequiredCraftCount(_target,
                 inventoryOutputCount,
                 outputCursorCount,
-                output.getItem() == _target.getOutputItem() ? output.getCount() : 0,
+                0,
                 matchingOutputInputsInGrid);
         int requiredPerSlot = requiredCraftCount;
 
@@ -122,6 +125,12 @@ public class CraftGenericManuallyTask extends Task implements ITaskUsesCraftingG
                 // We could be OVER satisfied
                 boolean oversatisfies = present.getCount() > requiredPerSlot;
                 if (oversatisfies) {
+                    // Right-clicking with a held stack deposits one item instead of taking half,
+                    // which never converges. Put the cursor away first.
+                    if (!cursor.isEmpty()) {
+                        setDebugState("OVER SATISFIED slot: emptying cursor before splitting.");
+                        return storeCursorTask(mod, cursor);
+                    }
                     setDebugState("OVER SATISFIED slot! Right clicking slot to extract half and spread it out more.");
                     return new ClickSlotTask(currentCraftSlot, 1);
                 }
@@ -130,13 +139,7 @@ public class CraftGenericManuallyTask extends Task implements ITaskUsesCraftingG
 
         // Ensure our cursor is empty/can receive our item
         if (!ItemHelper.canStackTogether(StorageHelper.getItemStackInSlot(outputSlot), cursor)) {
-            Optional<Slot> toFit = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursor, false).or(() -> StorageHelper.getGarbageSlot(mod));
-            if (toFit.isPresent()) {
-                return new ClickSlotTask(toFit.get());
-            } else {
-                // Eh screw it
-                return new ThrowCursorTask();
-            }
+            return storeCursorTask(mod, cursor);
         }
 
         if (!StorageHelper.getItemStackInSlot(outputSlot).isEmpty()) {
@@ -145,6 +148,15 @@ public class CraftGenericManuallyTask extends Task implements ITaskUsesCraftingG
             // Wait
             return null;
         }
+    }
+
+    private static Task storeCursorTask(AltoClef mod, ItemStack cursor) {
+        Optional<Slot> toFit = mod.getItemStorage().getSlotThatCanFitInPlayerInventory(cursor, false).or(() -> StorageHelper.getGarbageSlot(mod));
+        if (toFit.isPresent()) {
+            return new ClickSlotTask(toFit.get());
+        }
+        // Eh screw it
+        return new ThrowCursorTask();
     }
 
     @Override

@@ -2,7 +2,6 @@ package adris.altoclef.trackers.storage;
 
 import adris.altoclef.trackers.Tracker;
 import adris.altoclef.trackers.TrackerManager;
-import adris.altoclef.util.helpers.ItemHelper;
 import adris.altoclef.util.helpers.StorageHelper;
 import adris.altoclef.util.slots.CraftingTableSlot;
 import adris.altoclef.util.slots.CursorSlot;
@@ -102,8 +101,9 @@ public class InventorySubTracker extends Tracker {
             if (Slot.isCursor(toCheckStackable))
                 continue;
             ItemStack stackToAddTo = StorageHelper.getItemStackInSlot(toCheckStackable);
-            // We must have SOME room left, then we decide whether we care about having ENOUGH
-            if (!stackToAddTo.isEmpty() && ItemHelper.canStackTogether(item, stackToAddTo)) {
+            // We must have SOME room left, then we decide whether we care about having ENOUGH.
+            // canStackTogether requires the whole stack to fit, which would skip partial top-ups.
+            if (!stackToAddTo.isEmpty() && ItemStack.isSameItemSameComponents(item, stackToAddTo)) {
                 int roomLeft = stackToAddTo.getMaxStackSize() - stackToAddTo.getCount();
                 if (canFitInExistingStack(roomLeft, item.getCount(), acceptPartial)) {
                     result.add(toCheckStackable);

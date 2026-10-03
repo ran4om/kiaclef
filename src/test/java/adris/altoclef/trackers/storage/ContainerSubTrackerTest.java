@@ -76,6 +76,60 @@ class ContainerSubTrackerTest {
     }
 
     @Test
+    void repeatedClickThatReopensTheMenuBindsTheFinalMenu() {
+        ContainerMenuSession session = new ContainerMenuSession();
+        Object world = new Object();
+        Object player = new Object();
+        Object inventoryMenu = new Object();
+        Object firstMenu = new Object();
+        Object reopenedMenu = new Object();
+        Object unpromptedMenu = new Object();
+        BlockPos chest = new BlockPos(4, 70, -2);
+
+        // Two clicks reach the server before the first menu opens; it closes and reopens.
+        session.noteInteraction(world, player, inventoryMenu, chest, Blocks.CHEST, 44);
+        session.noteInteraction(world, player, inventoryMenu, chest, Blocks.CHEST, 45);
+        session.onScreenChanged(world, player, firstMenu, true, 45, true,
+                block -> true, (position, block) -> true);
+        session.onScreenChanged(world, player, inventoryMenu, false, 45, false,
+                block -> true, (position, block) -> true);
+        session.onScreenChanged(world, player, reopenedMenu, true, 45, true,
+                block -> true, (position, block) -> true);
+        assertEquals(chest, session.getBoundContainer(world, player, reopenedMenu,
+                (position, block) -> true).orElseThrow().position());
+
+        // Both clicks are used up, so a further replacement stays unbound.
+        session.onScreenChanged(world, player, unpromptedMenu, true, 46, true,
+                block -> true, (position, block) -> true);
+        assertTrue(session.getBoundContainer(world, player, unpromptedMenu,
+                (position, block) -> true).isEmpty());
+    }
+
+    @Test
+    void nextChestAfterABoundOneStartsAFreshInteraction() {
+        ContainerMenuSession session = new ContainerMenuSession();
+        Object world = new Object();
+        Object player = new Object();
+        Object inventoryMenu = new Object();
+        Object firstMenu = new Object();
+        Object secondMenu = new Object();
+        BlockPos first = new BlockPos(1, 70, 1);
+        BlockPos second = new BlockPos(3, 70, 1);
+
+        session.noteInteraction(world, player, inventoryMenu, first, Blocks.CHEST, 1);
+        session.noteInteraction(world, player, inventoryMenu, first, Blocks.CHEST, 2);
+        session.onScreenChanged(world, player, firstMenu, true, 2, true,
+                block -> true, (position, block) -> true);
+        session.onScreenChanged(world, player, inventoryMenu, false, 5, false,
+                block -> true, (position, block) -> true);
+        session.noteInteraction(world, player, inventoryMenu, second, Blocks.CHEST, 8);
+        session.onScreenChanged(world, player, secondMenu, true, 9, true,
+                block -> true, (position, block) -> true);
+        assertEquals(second, session.getBoundContainer(world, player, secondMenu,
+                (position, block) -> true).orElseThrow().position());
+    }
+
+    @Test
     void crosshairOnlyAndRepeatedSameTypeScreensStayUnbound() {
         ContainerMenuSession session = new ContainerMenuSession();
         Object world = new Object();

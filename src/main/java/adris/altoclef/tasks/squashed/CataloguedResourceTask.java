@@ -100,8 +100,8 @@ public class CataloguedResourceTask extends ResourceTask implements TaskFailure 
             }
             if (shouldDeferForPendingWheatReplant(task, mod)) return false;
         }
-        // All targets are met.
-        return true;
+        // All targets are met; finish once leftover grid ingredients are back in the inventory.
+        return !hasLeftoverPlayerGridItems();
     }
 
     static boolean shouldDeferForPendingWheatReplant(ResourceTask task, AltoClef mod) {

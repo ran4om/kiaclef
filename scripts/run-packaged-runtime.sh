@@ -344,6 +344,7 @@ classify_summary() {
     naturalresource) required_row="RESOURCE_LIST_ACCEPTANCE" ;;
     litematicarecovery) required_row="LITEMATICA_RECOVERY_ACCEPTANCE" ;;
     mobdefense) required_row="MOB_DEFENSE_CAPACITY_ACCEPTANCE" ;;
+    ui) required_row="UI_SCREENSHOT" ;;
   esac
   if [[ -n "${required_row}" ]] \
     && ! awk -F '\t' -v required="${required_row}" '$1 == required && $2 == "PASS" { found = 1 } END { exit !found }' "${RESULT_FILE}"; then
@@ -604,6 +605,9 @@ trap cleanup_runtime EXIT
 trap 'if [[ "${RUNTIME_STARTING:-0}" == 1 ]]; then PENDING_SIGNAL=130; else exit 130; fi' INT
 trap 'if [[ "${RUNTIME_STARTING:-0}" == 1 ]]; then PENDING_SIGNAL=143; else exit 143; fi' TERM
 
+# Optional extra JVM flags (whitespace-separated), e.g. diagnostics toggles.
+read -r -a EXTRA_JVM_ARGS <<<"${ALTOCLEF_EXTRA_JVM_ARGS:-}"
+
 cd "${RUN_DIR}"
 RUNTIME_STARTING="1"
 set -m
@@ -613,6 +617,7 @@ timeout --foreground --signal=TERM --kill-after=15s "${RUNTIME_TIMEOUT_SECONDS}s
   "-Daltoclef.builderPlacementDiagnostics=${ALTOCLEF_BUILDER_DIAGNOSTICS:-false}" \
   "-Daltoclef.runtimeStart=${RUNTIME_START}" \
   "-Daltoclef.runtimeCrafterOrientation=${ALTOCLEF_CRAFTER_ORIENTATION:-north_up}" \
+  ${EXTRA_JVM_ARGS[@]+"${EXTRA_JVM_ARGS[@]}"} \
   -cp "${GAME_CP}" \
   net.fabricmc.loader.impl.launch.knot.KnotClient \
   --version "${GAME_VERSION}" \

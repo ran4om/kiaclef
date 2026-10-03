@@ -38,6 +38,11 @@ public class InteractWithBlockTask extends Task {
     private final Input _interactInput;
     private final boolean _shiftClick;
     private final TimerGame _clickTimer = new TimerGame(5);
+    // Re-clicking before the server answers opens a container twice (open, close, reopen),
+    // which breaks container tracking, so give menu blocks time to open before clicking again.
+    private static final double RECLICK_SECONDS = 0.3;
+    private static final double MENU_RECLICK_SECONDS = 1.5;
+    private final TimerGame _reclickTimer = new TimerGame(0);
     private final MovementProgressChecker _moveChecker = new MovementProgressChecker(4, 0.1, 4, 0.01);
     private final TimeoutWanderTask _wanderTask = new TimeoutWanderTask(5);
     private final int reachDistance = 0;
@@ -130,6 +135,7 @@ public class InteractWithBlockTask extends Task {
     protected void onStart(AltoClef mod) {
         _moveChecker.reset();
         _wanderTask.resetWander();
+        _reclickTimer.forceElapse();
     }
 
     @Override
@@ -247,7 +253,12 @@ public class InteractWithBlockTask extends Task {
                 } else {
                     mod.getSlotHandler().forceDeequipRightClickableItem();
                 }
-                mod.getInputControls().tryPress(_interactInput);
+                if (_reclickTimer.elapsed()) {
+                    mod.getInputControls().tryPress(_interactInput);
+                    boolean opensMenu = mod.getWorld().getBlockState(_target).getMenuProvider(mod.getWorld(), _target) != null;
+                    _reclickTimer.setInterval(opensMenu ? MENU_RECLICK_SECONDS : RECLICK_SECONDS);
+                    _reclickTimer.reset();
+                }
                 //mod.getClientBaritone().getInputOverrideHandler().setInputForceState(_interactInput, true);
                 if (_shiftClick) {
                     mod.getInputControls().hold(Input.SNEAK);
