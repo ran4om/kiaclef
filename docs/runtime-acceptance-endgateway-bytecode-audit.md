@@ -7,7 +7,7 @@ geometry assertion was checked against the mapped 26.2 bytecode, rather than ass
 
 ## Evidence source
 
-- Jar: `/home/kiarad/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged-deobf/26.2/minecraft-merged-deobf-26.2.jar`
+- Jar: `~/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged-deobf/26.2/minecraft-merged-deobf-26.2.jar`
 - Class: `net.minecraft.world.level.levelgen.feature.EndGatewayFeature`
 - Inspection: `javap -classpath <jar> -p -c net.minecraft.world.level.levelgen.feature.EndGatewayFeature`
 - Feature bounding loop: bytecode offsets 19–37 iterates from `origin + (-1,-2,-1)` through `origin + (1,2,1)`.

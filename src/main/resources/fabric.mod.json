@@ -2,12 +2,13 @@
   "schemaVersion": 1,
   "id": "altoclef",
   "version": "${version}",
-  "name": "Alto Clef",
-  "description": "Autonomous resource gathering, crafting, and schematic building for Minecraft 26.2",
-  "authors": ["TacoTechnica", "James Green"],
+  "name": "Kiaclef",
+  "description": "Autonomous resource gathering, crafting, and schematic building for Minecraft 26.2. A fork of AltoClef with an in-game control panel.",
+  "authors": ["ran4om", "TacoTechnica (AltoClef)", "James Green (AltoClef)"],
   "contact": {
-    "homepage": "https://github.com/gaucho-matrero/altoclef",
-    "sources": "https://github.com/gaucho-matrero/altoclef"
+    "homepage": "https://github.com/ran4om/kiaclef",
+    "sources": "https://github.com/ran4om/kiaclef",
+    "issues": "https://github.com/ran4om/kiaclef/issues"
   },
   "license": "MIT",
   "icon": "assets/altoclef/icon.png",

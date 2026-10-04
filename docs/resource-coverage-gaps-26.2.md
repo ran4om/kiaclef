@@ -57,7 +57,7 @@ The report also lists blocks whose items exist in the registry but whose intende
 ## Sources in this checkout
 
 - `.audit/gameplay/placeable-block-coverage-26.2.md` for the registry inventory.
-- `/home/kiarad/.gradle/caches/fabric-loom/26.2/minecraft-merged.jar` for `data/minecraft/loot_table/blocks/*.json` drop-table verification.
+- `~/.gradle/caches/fabric-loom/26.2/minecraft-merged.jar` for `data/minecraft/loot_table/blocks/*.json` drop-table verification.
 - `src/main/java/adris/altoclef/TaskCatalogue.java` for `mine`, `mob`, dimension defaults, and catalogue reachability.
 - `src/main/java/adris/altoclef/tasks/resources/MineAndCollectTask.java` for block tracking, mining-level preparation, and drop pickup.
 - `src/main/java/adris/altoclef/tasks/resources/KillAndLootTask.java` for entity search and kill behavior.

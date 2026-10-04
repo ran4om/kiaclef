@@ -10,7 +10,7 @@ import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * Rebindable keys (Options > Controls > Alto Clef): open the control panel, stop
+ * Rebindable keys (Options > Controls > Kiaclef): open the control panel, stop
  * the current task, and toggle the task HUD.
  */
 public final class AltoClefKeybinds {

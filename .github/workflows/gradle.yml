@@ -1,47 +1,27 @@
-# This workflow will build a Java project with Gradle
-# For more information check https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-gradle
-
-name: Java CI with Gradle
+name: Build
 
 on:
   push:
-     branches: [ main ]
+    branches: [ main ]
   pull_request:
-     branches: [ main ]
-    
-jobs:   
+    branches: [ main ]
+
+jobs:
   build:
-   runs-on: ubuntu-latest
-   
-   steps:
-    - uses: actions/checkout@v2
-    - name: Set up JDK 17
-      uses: actions/setup-java@v2
-      with:
-        java-version: '17'
-        distribution: 'adopt'
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-    - name: Build with Gradle
-      run: ./gradlew build
-      
-    - name: Archive Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: Artifacts
-        path: ./build/libs
-        
-    - name: Hash Artifacts 
-      run: |
-        for u in $(ls) 
-        do
-        echo "$(sha256sum $u)" >> hashes.sha256
-        done
-      shell: bash
-      working-directory: ./build/libs
-  
-    - name: Upload Hashes
-      uses: actions/upload-artifact@v2
-      with:
-        name: Hashes
-        path: ./build/libs/hashes.sha256
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 26
+        uses: actions/setup-java@v4
+        with:
+          java-version: '26'
+          distribution: 'temurin'
+      - name: Build and test
+        run: ./gradlew --console=plain build
+      - name: Hash artifacts
+        working-directory: ./build/libs
+        run: sha256sum *.jar > hashes.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kiaclef
+          path: build/libs

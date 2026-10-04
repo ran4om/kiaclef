@@ -1,67 +1,78 @@
-# altoclef
+# Kiaclef
 
-Plays block game.
+**Kiaclef is a fork of [AltoClef](https://github.com/gaucho-matrero/altoclef)**, the client-side Minecraft bot that plays survival on its own, ported to **Minecraft 26.2** (Fabric) with an in-game control panel and many bug fixes.
 
-Powered by Baritone.
+Tell it what you want and it works out how to get it: ask for diamonds from an empty inventory and it gathers wood, crafts tools, mines and smelts iron, finds fuel, and mines the diamonds. It can collect whole lists of items and build Litematica schematics, gathering and crafting the materials first.
 
-A client side bot that can accomplish any Minecraft task that is relatively simple and can be split into smaller tasks. "Relatively Simple" is a vague term, so check the list of current capabilities to see examples.
+All credit for the original bot goes to the AltoClef authors (TacoTechnica and contributors). Pathing and building run on [Baritone](https://github.com/cabaletta/baritone), which is bundled.
 
-Became [the first bot to beat Minecraft fully autonomously](https://youtu.be/baAa6s8tahA) on May 24, 2021.
+## What's different from AltoClef
 
-**Join the [Discord Server](https://discord.gg/JdFP4Kqdqc)** for discussions/updates/goofs & gaffs
+- **Runs on Minecraft 26.2** with Fabric Loader 0.19.5, Fabric API 0.154.2+26.2, Mojang mappings and Baritone 1.19.0. Upstream AltoClef targets Minecraft 1.18.2.
+- **Control panel.** Press **J** in-game:
+  - **Tasks** shows what the bot is doing, how long it has been running, and how the last task ended. Request any item (Tab completes names), queue several items into one request, or use presets (wood, iron, diamonds, food, iron gear, beat the game).
+  - **Build** lists schematics from your `schematics` folder and can build the active Litematica placement.
+  - **Console** runs any command, with history and one-click tools.
+  - **Stop** cancels the current task. `Ctrl+K` does the same from anywhere.
+- **Task HUD** redrawn as a compact panel with elapsed time and the current step highlighted.
+- **Litematica building** of `.litematic`, `.schem` and `.schematic` files and active placements, with the bot gathering and crafting materials before building and resuming after interruptions.
+- **Fixes** found by running the bot in packaged game sessions. Container tracking survived double clicks and server lag. Crafting no longer loops forever on over-filled grids, cursor items, or recipe-book output. Leftover crafting ingredients are returned to the inventory. Partly full stacks get topped up. Baritone no longer pauses because it thinks a carried chest is missing.
 
-## How it works
+## Install
 
-Take a look at this [Guide from the wiki](https://github.com/gaucho-matrero/altoclef/wiki/1:-Documentation:-Big-Picture) or this [Video explanation](https://youtu.be/q5OmcinQ2ck?t=387)
+1. Install [Fabric Loader](https://fabricmc.net/use/) **0.19.5+** for Minecraft **26.2** and Java **25+**.
+2. Put [Fabric API](https://modrinth.com/mod/fabric-api) **0.154.2+26.2** in your `mods` folder.
+3. Download `kiaclef-1.0.0.jar` from [Releases](https://github.com/ran4om/kiaclef/releases) and put it in `mods`.
+4. Optional, for `@build placement`: [Litematica](https://modrinth.com/mod/litematica) 0.28.8 and MaLiLib 0.29.6.
 
-## Current capabilities, Examples:
-- Obtain 400+ Items from a fresh survival world, like diamond armor, cake, and nether brick stairs
-- Dodge mob projectiles and force field mobs away while accomplishing arbitrary tasks
-- Collect + smelt food from animals, hay, & crops
-- Receive commands from chat whispers via /msg. Whitelist + Blacklist configurable (hereby dubbed the Butler System). Here's a [Butler system demo video](https://drive.google.com/file/d/1axVYYMJ5VjmVHaWlCifFHTwiXlFssOUc/view?usp=sharing)
-- Simple config file that can be reloaded via command (check .minecraft directory)
-- Beat the entire game on its own (no user input.)
-- Print the entire bee movie script with signs in a straight line, automatically collecting signs + bridging materials along the way.
-- Become the terminator: Run away from players while unarmed, gather diamond gear in secret, then return and wreak havoc.
+Baritone is bundled inside Kiaclef. **Don't install a separate Baritone or AltoClef jar alongside it.** Kiaclef keeps AltoClef's internal mod id, so its settings stay in the same `altoclef/` folder and it can't be loaded next to AltoClef.
 
-## Download
+## Usage
 
-**Note:** After installing, please move/delete your old baritone configurations if you have any. Preexisting baritone configurations will interfere with altoclef and introduce bugs. This will be fixed in the future.
+Press **J** for the control panel, or type commands in chat with the `@` prefix:
 
-### Alternate Versions (Recommended) (Unofficial)
+```text
+@get diamond 3
+@get [chest 2, stick 16]
+@list
+@build myhouse.litematic
+@build placement
+@stop
+```
 
-If you are looking for 1.19.2 - 1.19.4 support, check out this [gist](https://gist.github.com/JustaSqu1d/171df3ff386859da31d37534122d3b10). Note that these projects are forks of this original project and not directly affliated with Alto Clef. It is also more up-to-date with bug fixes and features.
+See [usage.md](usage.md) for all commands and settings, and [INSTALL_26.2.md](INSTALL_26.2.md) for build instructions, test modes, and detailed verification notes.
 
-#### (old) Nightly Release
+## Status and limits
 
-Start by downloading [the Latest Long Term Release](https://github.com/gaucho-matrero/altoclef/releases), then [Download the Nightly](https://nightly.link/gaucho-matrero/altoclef/workflows/gradle/main/Artifacts.zip) & replace `altoclef-4.0-SNAPSHOT.jar`.
+Version 1.0.0 was checked by unit tests (1,383 passing) and by automated packaged game sessions on freshly generated worlds. These passed:
 
-If the Nightly Link doesn't work, check the latest [Build Action](https://github.com/gaucho-matrero/altoclef/actions) that succeeded and download `Artifacts.zip` (you must be signed into GitHub). Replace your existing `altoclef-4.0-SNAPSHOT.jar` with the one found in `Artifacts.zip`
+- **Diamonds from an empty inventory on untouched terrain.** Wood, tools, iron, smelting, and diamond, followed by an item list request and a schematic build.
+- **Resource lists** (`@get [chest 2, stick 4]`) in a natural world.
+- **Litematica building** from naturally gathered materials, including recovery after Mob Defense interrupts the build.
+- **Containers:** looting, depositing, stashing, and overflow stacking.
+- **Kelp crafting chain, Mob Defense task selection, and the control panel.**
 
-Then, copy `altoclef-4.0-SNAPSHOT.jar` from `Artifacts.zip` to `./mods`.
+Known limits:
 
-Then, copy the `baritone-unoptimized-fabric-1.XX.X.jar` from the long term release zip file to `./mods`
+- **Night survival is weak.** Mob Defense reacts late to creepers and Drowned, so long tasks in the open at night can end in death and lost items.
+- **Not verified:** speedrunning (`@gamer`), Nether/End travel on natural terrain, real combat, multiplayer servers, large schematics, and most of the catalogue's items. Task wiring exists for 763 of 1,054 placeable items, but most have never been gathered in a test.
 
-#### (old) Long Term Release
+Bug reports are welcome in [Issues](https://github.com/ran4om/kiaclef/issues).
 
-[Check releases](https://github.com/gaucho-matrero/altoclef/releases). Note you will need to copy over both jar files for the mod to work.
+## Building from source
 
-#### (old) Meloweh's Extra Features Release (Unofficial)
+```sh
+./gradlew build
+```
 
-Has some schematic support, command macros and a few utility features. Will eventually be merged, but if you can try it out now if you'd like:
+This needs a Java 26 JDK for the Gradle toolchain; the mod itself targets Java 25. The jar is written to `build/libs/kiaclef-1.0.0.jar`.
 
-- [AltoClef jar](https://github.com/Meloweh/altoclef/releases)
-- [Baritone jar](https://github.com/Meloweh/baritone/releases)
+## Credits and licenses
 
-### Versions
+- **AltoClef**, © 2020 Adris Jautakas (TacoTechnica) and contributors, MIT License. Kiaclef is a modified version of it and is released under the same [MIT License](LICENSE).
+- **Baritone** 1.19.0 by leijurv, Brady and contributors, bundled unmodified, [LGPL-3.0](LICENSE-BARITONE). Source: https://github.com/cabaletta/baritone
+- **Jackson** (core, databind, annotations) 2.20 and **Apache Commons Lang** 3.20.0, bundled, Apache License 2.0.
 
-This is a **fabric only** mod, currently only available for **Minecraft 1.18**.
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists every bundled and optional component.
 
-For older MC versions, try [multiconnect](https://www.curseforge.com/minecraft/mc-mods/multiconnect) (NOTE: multiconnect is untested and not affiliated with altoclef, use at your own risk!)
-
-
-## [Usage Guide](usage.md)
-
-## [TODO's/Future Features](todos.md)
-
-## [Development Guide](develop.md)
+Kiaclef is not affiliated with Mojang or Microsoft, or with the AltoClef or Baritone projects.

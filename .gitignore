@@ -120,3 +120,12 @@ run/
 
 
 !libs/baritone-unoptimized-fabric-1.19.0.jar
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Local test evidence and runtime folders
+.audit/
+/altoclef/
+/logs/

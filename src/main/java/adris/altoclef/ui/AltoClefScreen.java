@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 /**
- * In-game control panel for Alto Clef. Every action is routed through the regular
+ * In-game control panel for Kiaclef. Every action is routed through the regular
  * command executor, so the panel behaves exactly like typing the command in chat.
  */
 public class AltoClefScreen extends Screen {
@@ -58,7 +58,7 @@ public class AltoClefScreen extends Screen {
     private Button hudButton;
 
     public AltoClefScreen(AltoClef mod) {
-        super(Component.literal("Alto Clef"));
+        super(Component.literal("Kiaclef"));
         this.mod = mod;
     }
 
@@ -456,7 +456,7 @@ public class AltoClefScreen extends Screen {
         int innerWidth = panelWidth - PAD * 2;
 
         // Header: title and status.
-        graphics.text(font, "Alto Clef", x + 2, top + 10, UiTheme.ACCENT, false);
+        graphics.text(font, "Kiaclef", x + 2, top + 10, UiTheme.ACCENT, false);
         UserTaskChain user = mod.getUserTaskChain();
         TaskChain chain = mod.getTaskRunner().getCurrentTaskChain();
         boolean running = chain != null && !chain.getTasks().isEmpty();

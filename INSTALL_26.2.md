@@ -1,6 +1,8 @@
-# AltoClef for Minecraft 26.2
+# Kiaclef for Minecraft 26.2
 
-**Release candidate: Build 168.** `build/libs/altoclef-0.5.0.jar`, archived as `.audit/artifacts/altoclef-build168-ab330c6b.jar`, SHA-256 `ab330c6be84c893704b86ac0dda515eaf42b2e5c8917862f8e44cc208eb9c9dd`. It compiled production and runtime-test classes and passed 1,383 tests with zero failures, errors, or skips.
+Kiaclef is a fork of [AltoClef](https://github.com/gaucho-matrero/altoclef). See the [README](README.md) for an overview, credits and licenses.
+
+**Release: Kiaclef 1.0.0.** `kiaclef-1.0.0.jar`, SHA-256 `d20f06011e64072b9b8c65dba770561ed49373aee647d4710983dea4567157ec`, built from the same code as Build 168 below plus the rename. It compiled production and runtime-test classes and passed 1,383 tests with zero failures, errors, or skips. On that exact jar, the UI scenario passed (Run 239). The kelp scenario made the dried kelp block from scratch but used a natural tree instead of the prepared logs, which the fixture counts as a failure (Run 240). Build 168 itself had SHA-256 `ab330c6be84c893704b86ac0dda515eaf42b2e5c8917862f8e44cc208eb9c9dd`.
 
 Packaged gameplay, each run on a freshly generated world:
 
@@ -15,7 +17,7 @@ Packaged gameplay, each run on a freshly generated world:
 | 234 | 167 | `ui` | PASS | Control panel tabs and HUD render without errors. |
 | 229, 238 | 167, 168 | `natural` | FAIL | Both runs finished the gathering chain, and Run 238 also completed the build, but runs that took longer reached night: a creeper (229) and Drowned (238) killed the bot and its diamonds were lost. |
 
-Builds 167 and 168 changed only crafting-output and builder-candidate code, which Runs 230–238 exercised. Earlier defects and the full decision trail are in [the acceptance matrix](.audit/upstream-acceptance-matrix.md) and [gameplay status](.audit/gameplay/status.md).
+Builds 167 and 168 changed only crafting-output and builder-candidate code, which Runs 230–238 exercised.
 
 **Support limits.** These runs cover the main workflows on two seeds and a handful of fixtures. Survival at night is weak: Mob Defense reacts late to creepers and Drowned, so long tasks in open terrain can end in death and lost items. The runs don't cover every catalogued item: catalogue wiring covers 763 of 1,054 placeable items (Build 150 count), and most have never been gathered in a test. Speedrun (`@gamer`), Nether/End travel on natural terrain, combat beyond scheduler selection, multiplayer servers, and large schematics are not verified. Prepared-fixture passes do not prove natural discovery of the seeded inputs.
 
@@ -26,9 +28,9 @@ Builds 167 and 168 changed only crafting-output and builder-candidate code, whic
 - The development toolchain is Gradle **9.6.1** with Fabric Loom **1.15.5**.
 - For `@build placement`, install Litematica **0.28.8** and MaLiLib **0.29.6**. These versions were loaded together in the 26.2 runtime check.
 
-Baritone Fabric **1.19.0** is bundled inside AltoClef. Do not install a separate Baritone mod alongside it; duplicate copies can conflict.
+Baritone Fabric **1.19.0** is bundled inside Kiaclef. Do not install a separate Baritone mod alongside it; duplicate copies can conflict.
 
-The distributable jar includes AltoClef's MIT license and Baritone's LGPL-3.0 license. Bundled Jackson 2.20 and Commons Lang 3.20.0 dependencies include their license/notice files. Litematica 0.28.8 and MaLiLib 0.29.6 are separate optional mods; their Fabric metadata declares LGPLv3. The external mod jars are not bundled in AltoClef's distributable.
+The distributable jar includes the MIT license and Baritone's LGPL-3.0 license. Bundled Jackson 2.20 and Commons Lang 3.20.0 dependencies include their license/notice files. Litematica 0.28.8 and MaLiLib 0.29.6 are separate optional mods; their Fabric metadata declares LGPLv3. The external mod jars are not bundled in AltoClef's distributable.
 
 ## Build
 
@@ -38,7 +40,7 @@ From the project directory, run:
 ./gradlew build
 ```
 
-The distributable mod jar is `build/libs/altoclef-0.5.0.jar`. Install that jar in the `mods` folder of a Fabric 26.2 profile. Add the matching Fabric API jar. Add Litematica and MaLiLib when using active placement schematics.
+The distributable mod jar is `build/libs/kiaclef-1.0.0.jar`. Install that jar in the `mods` folder of a Fabric 26.2 profile. Add the matching Fabric API jar. Add Litematica and MaLiLib when using active placement schematics.
 
 ## Control panel
 
@@ -109,5 +111,3 @@ ALTOCLEF_RUNTIME_START=ui ./scripts/run-packaged-runtime.sh
 `natural` clears inventory, initializes health and food once, selects Survival and Normal difficulty, then requests diamond, lists resources, and requests chest/stick. It does not add resources or change terrain and rejects superflat worlds. Use a newly generated default world for this mode. Prepared fixtures may seed inventories, ores, portals, water pools, or block layouts and may edit terrain; each result records which phases it skipped. A pass in a prepared fixture does not establish natural-terrain discovery or gathering of fixture-seeded inputs. The full run and all new modes remain under acceptance; see the status matrix before treating any feature as verified.
 
 Loom's `runClient` development launcher currently hits a Minecraft 26.2 development-renderer validation failure during early resource loading (a missing `Globals` uniform). The packaged-runtime script launches Fabric in production mode and is the relevant path for checking the distributable jar; this launcher caveat does not establish that all port behavior has been verified.
-
-Run 111 failed final UI cleanup on Build 131 after all eight schematic cells matched and file/active empty-chest payload acceptance plus custom metadata rejection passed. Server and client retained one item on the cursor. Evidence: `.audit/gameplay/active-empty-chest-build-cursor-cleanup-fail-run111.tsv` (SHA-256 `89999e99de5a182d938d04d3c0989673799dffed59dc61ae56c31657d8148fe1`); normal-quit log SHA-256 `9d5a459e16dec68d6b0e84e2eb50f0ec50f798fa532d4a4ed8b8b32da37a07d8`. This cleanup failure is historical and is superseded by later cleanup passes in Runs 114–116. Run 112 passed mud/root command acceptance; TSV SHA-256 `5827351e401bb7fc5c0e7e6b94db30d50a1ed3eca195138878513aa9cd458e5b`, log SHA-256 `0caf5437f214dc630df53677f8eff4861879a12f9eb432eb5fa7445b5cca72fb`. Run 113 formally reproduced the cursor bug on archived Build 131 plus harness 134: an already-matching stone schematic reported completion while a custom-named stone remained on the server/client cursor. Evidence: `.audit/gameplay/build-completion-occupied-cursor-reproduction-fail-run113.tsv` (SHA-256 `6e0ef14b21f12be1ff9aebc1b7eb63698b3cbd9b1949894f61594dfb36af78fa`), PNG SHA-256 `bb3ac6d5c029e081cc8d028fb146475303c254e2d2996dd90be3899d27834471`. Run 114 passed on the saved Run 113 world using the occupied-cursor harness: BuildSchematicTask preserved the custom-named stone and delayed completion until the cursor and crafting grid were clear, with client/server state synchronized. Evidence: `.audit/gameplay/build-completion-cursor-grid-components-conserved-pass-run114.tsv` (SHA-256 `bd607cd4a2dc1713429f1560da46866e0e0cecac16093a901bc35e957dd5fdc3`), PNG SHA-256 `f5613466022df7f9c0394b21c7b4f6b3df0fcad002e60b8fae0c050c24cd0a05`. Run 115 passed a fresh active-Litematica gather/craft/build on seed `3323938809014745914`, using production jar SHA-256 `c50f2288397d478f8f6c4d7eae35daa0a7bde4b6ea85ac7776f590f1845a143e` and harness 134. Starting from empty inventory with prepared oak logs, stone floor, and coal ore, AltoClef gathered/crafted the chest and torches, placed the active two-region schematic, matched all eight cells including AIR, and ended with synchronized inventories and clean cursor/grid/UI. File and active adapters accepted canonical empty chest metadata and rejected custom chest metadata. Evidence: `.audit/gameplay/active-empty-chest-build-cleanup-pass-run115.tsv` (SHA-256 `b14345639654a9b86321571c61495af42a90aeff414d5796c6911b3550f97762`), PNG SHA-256 `41ad7f0a04f375bac60c851010e72649f83e92c6cda96cc7539d4ceb6912fd38`.

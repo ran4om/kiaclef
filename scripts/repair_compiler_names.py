@@ -9,7 +9,7 @@ methods={'squaredDistanceTo':'distanceToSqr','getSquaredDistance':'distSqr','isO
 methods.update({'getBlockPos':'blockPosition','isWithinDistance':'closerToCenterThan','isUltrawarm':'ultraWarm','isNatural':'natural','setYaw':'setYRot','setPitch':'setXRot','swingHand':'swing','getNutrition':'nutrition','getSaturationModifier':'saturation','getNormal':'getUnitVec3i','getVector':'getUnitVec3i','getBlockFromItem':'byItem','getWidth':'width','getSquaredDistance':'distanceToSqr','getHunger':'nutrition'})
 fields={'world':'level','currentScreenHandler':'containerMenu','playerScreenHandler':'inventoryMenu','currentScreen':'screen','interactionManager':'gameMode','crosshairTarget':'hitResult','textRenderer':'font','syncId':'containerId','selectedSlot':'selected','client':'minecraft','horizontalCollision':'horizontalCollision','forwardSpeed':'zza','sidewaysSpeed':'xxa','handSwinging':'swinging','jumping':'jumping','GRASS':'SHORT_GRASS','ITEM':'ITEM','BLOCK':'BLOCK'}
 changed=collections.Counter(); files={}; unresolved=collections.Counter()
-pat=r'(/home/kiarad/altoclef-26\.2/src/main/java/[^:\n]+):(\d+): error: ([^\n]+)\n(.*?)(?=\n/home/kiarad/altoclef-26\.2/|\n\s*\d[\d,]* errors|\Z)'
+pat=r'([^:\n]*?/src/main/java/[^:\n]+):(\d+): error: ([^\n]+)\n(.*?)(?=\n[^\n]*?/src/main/java/|\n\s*\d[\d,]* errors|\Z)'
 for m in re.finditer(pat,log,re.S):
  path=pathlib.Path(m[1]);rel=str(path.relative_to(root));line=int(m[2])-1;body=m[4]
  if '/mixins/' in rel or '/eventbus/events/' in rel or '/ui/' in rel or '/baritone/' in rel or '/schematic/' in rel:continue
