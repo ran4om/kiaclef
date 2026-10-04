@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Kiaclef: the Minecraft 26.2 bot that plays for you</title>
+  <meta name="description" content="Kiaclef is a Minecraft 26.2 bot that gathers, crafts and builds on its own. Ask for diamonds from an empty inventory and it works out every step. A fork of AltoClef.">
+  <meta name="theme-color" content="#0a0d10">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Kiaclef: the Minecraft 26.2 bot that plays for you">
+  <meta property="og:description" content="Ask for diamonds from an empty inventory. Kiaclef gathers wood, crafts tools, smelts iron and mines them. A fork of AltoClef for Minecraft 26.2.">
+  <meta property="og:image" content="https://ran4om.github.io/kiaclef/assets/og.jpg">
+  <meta property="og:url" content="https://ran4om.github.io/kiaclef/">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/keyart.webp" as="image">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+  <div class="poster" aria-hidden="true"></div>
+  <canvas id="world" aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="nav">
+    <a class="brand" href="#top" aria-label="Kiaclef home">
+      <img src="assets/favicon.svg" alt="" width="22" height="22">
+      <span>Kiaclef</span>
+    </a>
+    <nav aria-label="Sections">
+      <a href="#chain">How it works</a>
+      <a href="#footage">Footage</a>
+      <a href="#build">Building</a>
+      <a href="#panel">Control panel</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="icon-link" href="https://github.com/ran4om/kiaclef" aria-label="Kiaclef on GitHub"><i class="ph ph-github-logo"></i></a>
+      <a class="btn btn-small" href="#download">Download</a>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- HERO -->
+    <section class="hero scene" id="hero" data-scene="hero">
+      <div class="hero-copy">
+        <h1 class="reveal-lines"><span>Ask for diamonds.</span><span>It does the rest.</span></h1>
+        <p class="lede">Kiaclef is a Minecraft 26.2 bot that gathers, crafts and builds on its own. A fork of AltoClef.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#download"><i class="ph-bold ph-download-simple"></i> Download 1.0.0</a>
+          <a class="btn btn-ghost" href="https://github.com/ran4om/kiaclef"><i class="ph ph-github-logo"></i> Source</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- CHAIN: pinned scrollytelling -->
+    <section class="chain scene" id="chain" data-scene="chain">
+      <div class="chain-pin">
+        <div class="chain-panel">
+          <div class="chatbar" aria-label="Chat command">
+            <span class="chat-prompt">&gt;</span>
+            <span class="chat-text" data-type="@get diamond"></span><span class="caret"></span>
+          </div>
+          <h2>One command.<br>Every step worked out.</h2>
+          <ol class="steps">
+            <li data-step="0"><i class="ph ph-tree"></i><div><b>Chop a tree</b><span>Logs from the nearest trunk</span></div></li>
+            <li data-step="1"><i class="ph ph-cube"></i><div><b>Craft the basics</b><span>Planks, sticks, a crafting table</span></div></li>
+            <li data-step="2"><i class="ph ph-hammer"></i><div><b>Wooden pickaxe</b><span>Enough to break stone</span></div></li>
+            <li data-step="3"><i class="ph ph-mountains"></i><div><b>Upgrade to stone</b><span>Cobblestone into a stone pickaxe</span></div></li>
+            <li data-step="4"><i class="ph ph-magnifying-glass"></i><div><b>Find iron ore</b><span>Tracked, pathed to, mined</span></div></li>
+            <li data-step="5"><i class="ph ph-fire"></i><div><b>Smelt it</b><span>Furnace and fuel from what it carries</span></div></li>
+            <li data-step="6"><i class="ph ph-arrow-fat-line-up"></i><div><b>Iron pickaxe</b><span>The tier diamonds need</span></div></li>
+            <li data-step="7"><i class="ph ph-diamond"></i><div><b>Mine the diamond</b><span>Done. Back to you.</span></div></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTAGE: zoom reveal -->
+    <section class="footage" id="footage">
+      <div class="footage-pin">
+        <div class="footage-frame">
+          <video id="footage-video" muted playsinline loop preload="metadata" poster="assets/footage-poster.jpg">
+            <source src="assets/footage-natural.webm" type="video/webm">
+            <source src="assets/footage-natural.mp4" type="video/mp4">
+          </video>
+          <button class="play-toggle" type="button" aria-label="Pause footage"><i class="ph-bold ph-pause"></i></button>
+        </div>
+        <div class="footage-caption">
+          <h2>Not a mockup.</h2>
+          <p>A real run on a fresh world, sped up. Empty inventory to diamond, with the live task chain in the corner.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- LISTS: inventory fill -->
+    <section class="lists" id="lists">
+      <div class="lists-inner">
+        <div class="lists-copy">
+          <h2>Hand it a whole shopping list.</h2>
+          <p>Ask for several things at once. It plans shared ingredients once, gathers what is missing and crafts the rest.</p>
+          <code class="chip">@get [chest 2, stick 4, torch 8]</code>
+        </div>
+        <div class="inventory" aria-label="Inventory filling with requested items">
+          <div class="inv-grid" id="inv-grid"></div>
+          <div class="inv-hotbar" id="inv-hotbar"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BUILD: pinned 3D -->
+    <section class="build scene" id="build" data-scene="build">
+      <div class="build-pin">
+        <div class="build-copy">
+          <h2 class="build-title">Builds it, too.</h2>
+          <p class="build-a">Point it at a Litematica placement or a schematic file. It counts the materials, gathers and crafts them, then places every block.</p>
+          <p class="build-b">Something shoots at it? It dodges, then picks the build back up where it left off.</p>
+          <div class="build-meter" aria-hidden="true"><span class="build-count">0</span> / <span class="build-total">0</span> blocks</div>
+        </div>
+        <figure class="build-inset">
+          <img class="inset-video" src="assets/footage-build-poster.jpg" data-anim="assets/footage-build-anim.webp" alt="In-game footage: the bot places a Litematica build, dodges an arrow, then finishes" width="640" height="386" loading="lazy">
+          <figcaption>The real run: a Litematica build, interrupted by an arrow, finished anyway.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- PANEL: sticky tabs -->
+    <section class="panel" id="panel">
+      <div class="panel-pin">
+        <div class="panel-copy">
+          <kbd>J</kbd>
+          <h2>Everything from one panel.</h2>
+          <div class="panel-tabs" role="tablist" aria-label="Control panel tabs">
+            <button role="tab" data-tab="0" aria-selected="true">Tasks</button>
+            <button role="tab" data-tab="1" aria-selected="false">Build</button>
+            <button role="tab" data-tab="2" aria-selected="false">Console</button>
+          </div>
+          <p class="panel-desc" data-desc="0">See what it is doing and request items with autocomplete, lists and presets.</p>
+          <p class="panel-desc" data-desc="1" hidden>Pick a schematic from your folder, or build the active Litematica placement.</p>
+          <p class="panel-desc" data-desc="2" hidden>Run any command with history, plus one-click tools. Ctrl+K stops everything.</p>
+        </div>
+        <div class="panel-stage">
+          <img class="shot" data-shot="0" src="assets/panel-tasks.webp" alt="Kiaclef control panel, Tasks tab: current task, item request box and presets" width="1656" height="1000">
+          <img class="shot" data-shot="1" src="assets/panel-build.webp" alt="Kiaclef control panel, Build tab: schematic file list and Litematica placement button" width="1656" height="1000">
+          <img class="shot" data-shot="2" src="assets/panel-console.webp" alt="Kiaclef control panel, Console tab: command box, recent commands and tool buttons" width="1656" height="1000">
+        </div>
+      </div>
+    </section>
+
+    <!-- PROOF: bento -->
+    <section class="proof" id="proof">
+      <h2>Tested in real games.</h2>
+      <div class="bento">
+        <div class="cell cell-big">
+          <span class="big-num" data-count="1383">0</span>
+          <p>unit tests passing, plus automated sessions in the packaged game on freshly generated worlds.</p>
+        </div>
+        <div class="cell cell-list">
+          <h3>Passed end to end</h3>
+          <ul class="passes">
+            <li><i class="ph-bold ph-check"></i>Diamond from an empty inventory, untouched terrain</li>
+            <li><i class="ph-bold ph-check"></i>Item lists in a natural world</li>
+            <li><i class="ph-bold ph-check"></i>Litematica build with mid-build recovery</li>
+            <li><i class="ph-bold ph-check"></i>Chest loot, deposit, stash and stacking</li>
+            <li><i class="ph-bold ph-check"></i>Kelp to dried kelp block from scratch</li>
+            <li><i class="ph-bold ph-check"></i>Control panel and HUD</li>
+          </ul>
+        </div>
+        <div class="cell cell-art">
+          <img src="assets/footage-still.webp" alt="In-game view of the bot smelting iron, with the Kiaclef task HUD listing its current steps" loading="lazy">
+        </div>
+        <div class="cell cell-honest">
+          <h3>Still rough</h3>
+          <p>Night survival is weak: it reacts late to creepers and Drowned. Speedruns, natural Nether travel and multiplayer are untested.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- CREDITS -->
+    <section class="credits" id="credits">
+      <h2>Built on great open source.</h2>
+      <div class="credit-rows">
+        <a class="credit" href="https://github.com/gaucho-matrero/altoclef">
+          <span class="credit-name">AltoClef</span>
+          <span class="credit-what">The original bot by TacoTechnica and contributors. Kiaclef is a fork of it. MIT.</span>
+          <i class="ph ph-arrow-up-right"></i>
+        </a>
+        <a class="credit" href="https://github.com/cabaletta/baritone">
+          <span class="credit-name">Baritone</span>
+          <span class="credit-what">Pathfinding and building, bundled unmodified. LGPL-3.0.</span>
+          <i class="ph ph-arrow-up-right"></i>
+        </a>
+        <a class="credit" href="https://fabricmc.net/">
+          <span class="credit-name">Fabric</span>
+          <span class="credit-what">The mod loader and API it runs on. Apache-2.0.</span>
+          <i class="ph ph-arrow-up-right"></i>
+        </a>
+      </div>
+    </section>
+
+    <!-- DOWNLOAD -->
+    <section class="download scene" id="download" data-scene="finale">
+      <div class="download-inner">
+        <h2>Let it play.</h2>
+        <a class="btn btn-primary btn-huge" href="https://github.com/ran4om/kiaclef/releases/download/v1.0.0/kiaclef-1.0.0.jar"><i class="ph-bold ph-download-simple"></i> Download 1.0.0</a>
+        <ol class="install">
+          <li><span>Install</span><a href="https://fabricmc.net/use/">Fabric Loader</a> 0.19.5+ for Minecraft 26.2</li>
+          <li><span>Add</span><a href="https://modrinth.com/mod/fabric-api">Fabric API</a> 0.154.2+26.2</li>
+          <li><span>Drop</span><code>kiaclef-1.0.0.jar</code> into <code>mods</code>, then press J in-game</li>
+        </ol>
+        <p class="sha">SHA-256 <code>d20f06011e64072b9b8c65dba770561ed49373aee647d4710983dea4567157ec</code></p>
+        <p class="more"><a href="https://github.com/ran4om/kiaclef/releases/tag/v1.0.0">Release notes</a><a href="https://github.com/ran4om/kiaclef#readme">README</a><a href="https://github.com/ran4om/kiaclef/issues">Report a bug</a></p>
+      </div>
+      <footer class="foot">
+        <p>Kiaclef is a fork of AltoClef. MIT licensed. Not affiliated with Mojang, Microsoft, AltoClef or Baritone.</p>
+      </footer>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

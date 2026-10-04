@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="236" viewBox="0 0 880 236" role="img" aria-label="Typing @get diamond makes Kiaclef chop a tree, craft tools, mine and smelt iron, then mine the diamond">
+  <style>
+    .mono { font: 600 17px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #e8eee9; }
+    .label { font: 600 13px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  </style>
+  <rect x="1" y="1" width="878" height="234" rx="14" fill="#0f1418" stroke="#24302c"/>
+  <rect x="24" y="22" width="300" height="42" rx="9" fill="#070a0c" stroke="#24302c"/>
+  <text x="40" y="49" class="mono" style="fill:#5fd1a5">&gt;</text>
+  <clipPath id="typeclip"><rect x="62" y="26" height="32" width="0">
+    <animate attributeName="width" values="0;0;136;136" keyTimes="0;0.02;0.14;1" calcMode="discrete" dur="9s" repeatCount="indefinite"/>
+  </rect></clipPath>
+  <text x="62" y="49" class="mono" clip-path="url(#typeclip)">@get diamond</text>
+  <rect x="64" y="33" width="9" height="20" fill="#5fd1a5">
+    <animate attributeName="x" values="64;75;86;97;108;120;131;142;153;165;176;187;200" keyTimes="0;0.02;0.03;0.04;0.05;0.06;0.07;0.08;0.09;0.10;0.11;0.12;0.14" calcMode="discrete" dur="9s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;0;1" keyTimes="0;0.5;1" calcMode="discrete" dur="0.9s" repeatCount="indefinite"/>
+  </rect>
+  <text x="560" y="49" class="label" style="fill:#95a39d">One command. Every step worked out.</text>
+
+  <g id="chips" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="600">
+    <g>
+      <rect x="24" y="92" width="196" height="48" rx="10" fill="#161d21" stroke="#2a3632">
+        <animate attributeName="fill" values="#161d21;#161d21;#12302a;#12302a;#161d21" keyTimes="0;0.16;0.19;0.97;1" dur="9s" repeatCount="indefinite"/>
+        <animate attributeName="stroke" values="#2a3632;#2a3632;#5fd1a5;#5fd1a5;#2a3632" keyTimes="0;0.16;0.19;0.97;1" dur="9s" repeatCount="indefinite"/>
+      </rect>
+      <text x="42" y="121" fill="#5d6a65">Chop a tree<animate attributeName="fill" values="#5d6a65;#5d6a65;#e8eee9;#e8eee9;#5d6a65" keyTimes="0;0.16;0.19;0.97;1" dur="9s" repeatCount="indefinite"/></text>
+    </g>
+    <g>
+      <rect x="232" y="92" width="196" height="48" rx="10" fill="#161d21" stroke="#2a3632">
+        <animate attributeName="fill" values="#161d21;#161d21;#12302a;#12302a;#161d21" keyTimes="0;0.25;0.28;0.97;1" dur="9s" repeatCount="indefinite"/>
+        <animate attributeName="stroke" values="#2a3632;#2a3632;#5fd1a5;#5fd1a5;#2a3632" keyTimes="0;0.25;0.28;0.97;1" dur="9s" repeatCount="indefinite"/>
+      </rect>
+      <text x="250" y="121" fill="#5d6a65">Craft planks and a table<animate attributeName="fill" values="#5d6a65;#5d6a65;#e8eee9;#e8eee9;#5d6a65" keyTimes="0;0.25;0.28;0.97;1" dur="9s" repeatCount="indefinite"/></text>
+    </g>
+    <g>
+      <rect x="440" y="92" width="196" height="48" rx="10" fill="#161d21" stroke="#2a3632">
+        <animate attributeName="fill" values="#161d21;#161d21;#12302a;#12302a;#161d21" keyTimes="0;0.34;0.37;0.97;1" dur="9s" repeatCount="indefinite"/>
+        <animate attributeName="stroke" values="#2a3632;#2a3632;#5fd1a5;#5fd1a5;#2a3632" keyTimes="0;0.34;0.37;0.97;1" dur="9s" repeatCount="indefinite"/>
+      </rect>
+      <text x="458" y="121" fill="#5d6a65">Wooden pickaxe<animate attributeName="fill" values="#5d6a65;#5d6a65;#e8eee9;#e8eee9;#5d6a65" keyTimes="0;0.34;0.37;0.97;1" dur="9s" repeatCount="indefinite"/></text>
+    </g>
+    <g>
+      <rect x="648" y="92" width="208" height="48" rx="10" fill="#161d21" stroke="#2a3632">
+        <animate attributeName="fill" values="#161d21;#161d21;#12302a;#12302a;#161d21" keyTimes="0;0.43;0.46;0.97;1" dur="9s" repeatCount="indefinite"/>
+        <animate attributeName="stroke" values="#2a3632;#2a3632;#5fd1a5;#5fd1a5;#2a3632" keyTimes="0;0.43;0.46;0.97;1" dur="9s" repeatCount="indefinite"/>
+      </rect>
+      <text x="666" y="121" fill="#5d6a65">Stone pickaxe<animate attributeName="fill" values="#5d6a65;#5d6a65;#e8eee9;#e8eee9;#5d6a65" keyTimes="0;0.43;0.46;0.97;1" dur="9s" repeatCount="indefinite"/></text>
+    </g>
+    <g>
+      <rect x="24" y="152" width="196" height="48" rx="10" fill="#161d21" stroke="#2a3632">
+        <animate attributeName="fill" values="#161d21;#161d21;#12302a;#12302a;#161d21" keyTimes="0;0.52;0.55;0.97;1" dur="9s" repeatCount="indefinite"/>
+        <animate attributeName="stroke" values="#2a3632;#2a3632;#5fd1a5;#5fd1a5;#2a3632" keyTimes="0;0.52;0.55;0.97;1" dur="9s" repeatCount="indefinite"/>
+      </rect>
+      <text x="42" y="181" fill="#5d6a65">Find and mine iron<animate attributeName="fill" values="#5d6a65;#5d6a65;#e8eee9;#e8eee9;#5d6a65" keyTimes="0;0.52;0.55;0.97;1" dur="9s" repeatCount="indefinite"/></text>
+    </g>
+    <g>
+      <rect x="232" y="152" width="196" height="48" rx="10" fill="#161d21" stroke="#2a3632">
+        <animate attributeName="fill" values="#161d21;#161d21;#12302a;#12302a;#161d21" keyTimes="0;0.61;0.64;0.97;1" dur="9s" repeatCount="indefinite"/>
+        <animate attributeName="stroke" values="#2a3632;#2a3632;#5fd1a5;#5fd1a5;#2a3632" keyTimes="0;0.61;0.64;0.97;1" dur="9s" repeatCount="indefinite"/>
+      </rect>
+      <text x="250" y="181" fill="#5d6a65">Smelt it with found fuel<animate attributeName="fill" values="#5d6a65;#5d6a65;#e8eee9;#e8eee9;#5d6a65" keyTimes="0;0.61;0.64;0.97;1" dur="9s" repeatCount="indefinite"/></text>
+    </g>
+    <g>
+      <rect x="440" y="152" width="196" height="48" rx="10" fill="#161d21" stroke="#2a3632">
+        <animate attributeName="fill" values="#161d21;#161d21;#12302a;#12302a;#161d21" keyTimes="0;0.70;0.73;0.97;1" dur="9s" repeatCount="indefinite"/>
+        <animate attributeName="stroke" values="#2a3632;#2a3632;#5fd1a5;#5fd1a5;#2a3632" keyTimes="0;0.70;0.73;0.97;1" dur="9s" repeatCount="indefinite"/>
+      </rect>
+      <text x="458" y="181" fill="#5d6a65">Iron pickaxe<animate attributeName="fill" values="#5d6a65;#5d6a65;#e8eee9;#e8eee9;#5d6a65" keyTimes="0;0.70;0.73;0.97;1" dur="9s" repeatCount="indefinite"/></text>
+    </g>
+    <g>
+      <rect x="648" y="152" width="208" height="48" rx="10" fill="#161d21" stroke="#2a3632">
+        <animate attributeName="fill" values="#161d21;#161d21;#0f3a40;#0f3a40;#161d21" keyTimes="0;0.79;0.82;0.97;1" dur="9s" repeatCount="indefinite"/>
+        <animate attributeName="stroke" values="#2a3632;#2a3632;#56f0e0;#56f0e0;#2a3632" keyTimes="0;0.79;0.82;0.97;1" dur="9s" repeatCount="indefinite"/>
+      </rect>
+      <text x="666" y="181" fill="#5d6a65">Mine the diamond<animate attributeName="fill" values="#5d6a65;#5d6a65;#56f0e0;#56f0e0;#5d6a65" keyTimes="0;0.79;0.82;0.97;1" dur="9s" repeatCount="indefinite"/></text>
+    </g>
+  </g>
+  <text x="24" y="222" class="label" style="fill:#5fd1a5;font-weight:500" opacity="0">Done in about 5 minutes on a fresh world.<animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.84;0.88;0.97;1" dur="9s" repeatCount="indefinite"/></text>
+</svg>
